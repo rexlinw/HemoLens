@@ -102,7 +102,6 @@ export default function RealtimeCamera({ onClose }) {
         timeout: 30000,
       });
 
-      // Check if eyes were detected
       if (response.data.status === 'no_eyes_detected') {
         console.log('No eyes detected:', response.data.message);
         return;
@@ -168,7 +167,6 @@ export default function RealtimeCamera({ onClose }) {
         facing="front"
       />
 
-      {/* Overlay */}
       <View style={styles.overlay} pointerEvents="box-none">
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Live detection</Text>

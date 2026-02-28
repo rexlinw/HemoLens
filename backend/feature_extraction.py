@@ -5,11 +5,8 @@ from scipy import stats
 
 
 class FeatureExtractor:
-    """Extract 46 advanced color, statistical, and texture features from palpebral conjunctiva images."""
-
     @staticmethod
     def extract_rgb_features(image: np.ndarray) -> Dict[str, float]:
-        """Extract RGB color space features (4 features)."""
         if len(image.shape) != 3 or image.shape[2] != 3:
             return {"R_mean": 0, "G_mean": 0, "B_mean": 0, "RG_ratio": 0}
 
@@ -27,7 +24,6 @@ class FeatureExtractor:
 
     @staticmethod
     def extract_lab_features(image: np.ndarray) -> Dict[str, float]:
-        """Extract LAB color space features (6 features)."""
         if len(image.shape) != 3 or image.shape[2] != 3:
             return {"L_mean": 0, "a_mean": 0, "b_mean": 0,
                    "L_std": 0, "a_std": 0, "b_std": 0}
@@ -45,7 +41,6 @@ class FeatureExtractor:
 
     @staticmethod
     def extract_hsv_features(image: np.ndarray) -> Dict[str, float]:
-        """Extract HSV color space features (6 features)."""
         if len(image.shape) != 3 or image.shape[2] != 3:
             return {"H_mean": 0, "S_mean": 0, "V_mean": 0,
                    "H_std": 0, "S_std": 0, "V_std": 0}
@@ -63,7 +58,6 @@ class FeatureExtractor:
 
     @staticmethod
     def extract_ycrcb_features(image: np.ndarray) -> Dict[str, float]:
-        """Extract YCrCb color space features (3 features) - useful for skin tone."""
         if len(image.shape) != 3 or image.shape[2] != 3:
             return {"Y_mean": 0, "Cr_mean": 0, "Cb_mean": 0}
 
@@ -77,7 +71,6 @@ class FeatureExtractor:
 
     @staticmethod
     def extract_statistical_features(image: np.ndarray) -> Dict[str, float]:
-        """Extract statistical features for each RGB channel (12 features)."""
         features = {}
 
         if len(image.shape) == 3:
@@ -92,7 +85,6 @@ class FeatureExtractor:
 
     @staticmethod
     def extract_edge_features(image: np.ndarray) -> Dict[str, float]:
-        """Extract edge-based texture features (4 features)."""
         features = {}
 
         if len(image.shape) == 3:
@@ -113,7 +105,6 @@ class FeatureExtractor:
 
     @staticmethod
     def extract_contrast_features(image: np.ndarray) -> Dict[str, float]:
-        """Extract contrast and brightness features (3 features)."""
         features = {}
 
         if len(image.shape) == 3:
@@ -129,7 +120,6 @@ class FeatureExtractor:
 
     @staticmethod
     def extract_histogram_features(image: np.ndarray) -> Dict[str, float]:
-        """Extract histogram-based features (8 features)."""
         features = {}
 
         if len(image.shape) == 3:
@@ -153,19 +143,6 @@ class FeatureExtractor:
 
     @staticmethod
     def extract_all_features(image: np.ndarray) -> Dict[str, float]:
-        """
-        Extract all 46 advanced features from image.
-
-        Returns 46 features:
-        - RGB: 4
-        - LAB: 6
-        - HSV: 6
-        - YCrCb: 3
-        - Statistical: 12
-        - Edge: 4
-        - Contrast: 3
-        - Histogram: 8
-        """
         features = {}
 
         features.update(FeatureExtractor.extract_rgb_features(image))
@@ -181,12 +158,6 @@ class FeatureExtractor:
 
     @staticmethod
     def extract_features_batch(images: list) -> Tuple[np.ndarray, list]:
-        """
-        Extract 46 features from batch of images.
-
-        Returns:
-            Feature matrix (N x 46) and feature names list
-        """
         all_features = []
         feature_names = None
 
@@ -203,7 +174,6 @@ class FeatureExtractor:
 
     @staticmethod
     def get_feature_names() -> list:
-        """Get names of all 46 features."""
         return [
             "R_mean", "G_mean", "B_mean", "RG_ratio",
             "L_mean", "a_mean", "b_mean", "L_std", "a_std", "b_std",

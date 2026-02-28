@@ -1,10 +1,3 @@
-"""
-HemoLens FastAPI Application - Improved Version with Eye Detection
-Uses 46-feature Ridge Regression model for hemoglobin estimation
-Only predicts if eyes are detected in the image
-Accuracy: R² = 0.6267 (62.67%), MAE = 0.96 g/dL
-"""
-
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -20,14 +13,12 @@ from preprocessing import ImagePreprocessor
 from feature_extraction import FeatureExtractor
 from eye_detector import EyeDetector, get_hemoglobin_status
 
-# Initialize FastAPI app
 app = FastAPI(
     title="HemoLens API v2.0",
     description="Non-invasive Hemoglobin Estimation from Eye Images (46-Feature Ridge Model)",
     version="2.0.0"
 )
 
-# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -38,14 +29,12 @@ app.add_middleware(
     max_age=3600,
 )
 
-# Model paths
 MODEL_DIR = Path(__file__).parent / "models"
 RIDGE_MODEL_PATH = MODEL_DIR / "hemolens_ridge_model.pkl"
 SCALER_PATH = MODEL_DIR / "scaler.pkl"
-GB_MODEL_PATH = MODEL_DIR / "hemolens_gb_model.pkl"  # Backup
-SVR_MODEL_PATH = MODEL_DIR / "hemolens_svr_model.pkl"  # Backup
+GB_MODEL_PATH = MODEL_DIR / "hemolens_gb_model.pkl"
+SVR_MODEL_PATH = MODEL_DIR / "hemolens_svr_model.pkl"
 
-# Global variables
 ridge_model = None
 gb_model = None
 scaler = None
@@ -54,27 +43,22 @@ models_loaded = False
 
 
 def load_models():
-    """Load trained models and initialize eye detector."""
     global ridge_model, gb_model, scaler, eye_detector, models_loaded
 
     try:
-        # Load primary model (Ridge - best performance)
         with open(RIDGE_MODEL_PATH, 'rb') as f:
             ridge_model = pickle.load(f)
         print(f"✓ Ridge model loaded: {RIDGE_MODEL_PATH}")
 
-        # Load backup model (Gradient Boosting)
         if GB_MODEL_PATH.exists():
             with open(GB_MODEL_PATH, 'rb') as f:
                 gb_model = pickle.load(f)
             print(f"✓ Gradient Boosting model loaded (backup)")
 
-        # Load scaler
         with open(SCALER_PATH, 'rb') as f:
             scaler = pickle.load(f)
         print(f"✓ Scaler loaded: {SCALER_PATH}")
 
-        # Initialize eye detector
         eye_detector = EyeDetector()
         print(f"✓ Eye detector initialized")
 
@@ -92,7 +76,6 @@ def load_models():
 
 @app.on_event("startup")
 async def startup_event():
-    """Load models on startup."""
     print("\n" + "="*70)
     print("HemoLens API v2.0 - Starting")
     print("="*70)
@@ -108,7 +91,6 @@ async def startup_event():
 
 @app.get("/")
 async def root():
-    """Root endpoint - API information."""
     return {
         "name": "HemoLens API v2.0",
         "description": "Non-invasive Hemoglobin Estimation from Eye Images",
@@ -129,7 +111,6 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint."""
     return {
         "status": "healthy" if models_loaded else "unhealthy",
         "models_loaded": models_loaded,
@@ -144,7 +125,6 @@ async def health_check():
 
 @app.get("/info")
 async def get_model_info():
-    """Get model information."""
     feature_names = list(FeatureExtractor.get_feature_names())
 
     return {
@@ -185,8 +165,6 @@ async def get_model_info():
 
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
-    """Predict hemoglobin from single image with eye detection."""
-
     if not models_loaded:
         raise HTTPException(
             status_code=503,
@@ -199,12 +177,10 @@ async def predict(file: UploadFile = File(...)):
     start_time = time.time()
 
     try:
-        # Read image
         contents = await file.read()
         image = Image.open(io.BytesIO(contents)).convert("RGB")
         image_array = np.array(image)
 
-        # Detect eyes first
         if not eye_detector.detect_eyes(image_array):
             return {
                 "status": "no_eyes_detected",
@@ -215,7 +191,6 @@ async def predict(file: UploadFile = File(...)):
                 "filename": file.filename
             }
 
-        # Preprocess
         preprocessed = ImagePreprocessor.preprocess(
             image_array,
             resize=True,
@@ -224,24 +199,18 @@ async def predict(file: UploadFile = File(...)):
             enhance_contrast=True
         )
 
-        # Extract 46 features
         feature_extractor = FeatureExtractor()
         features_dict = feature_extractor.extract_all_features(preprocessed)
 
-        # Convert to array (maintaining order)
         feature_names = feature_extractor.get_feature_names()
         features_array = np.array([[features_dict[name] for name in feature_names]])
 
-        # Scale features
         features_scaled = scaler.transform(features_array)
 
-        # Predict with Ridge model
         hemoglobin_estimate = ridge_model.predict(features_scaled)[0]
 
-        # Clamp to physiological range
         hemoglobin_estimate = np.clip(hemoglobin_estimate, 6.0, 18.0)
 
-        # Get health status
         health_status = get_hemoglobin_status(hemoglobin_estimate)
 
         processing_time_ms = int((time.time() - start_time) * 1000)
@@ -266,8 +235,6 @@ async def predict(file: UploadFile = File(...)):
 
 @app.post("/predict/batch")
 async def predict_batch(files: list[UploadFile] = File(...)):
-    """Batch prediction from multiple images."""
-
     if not models_loaded:
         raise HTTPException(
             status_code=503,
@@ -280,7 +247,6 @@ async def predict_batch(files: list[UploadFile] = File(...)):
 
     for file in files:
         try:
-            # Read and preprocess
             contents = await file.read()
             image = Image.open(io.BytesIO(contents)).convert("RGB")
             image_array = np.array(image)
@@ -293,11 +259,9 @@ async def predict_batch(files: list[UploadFile] = File(...)):
                 enhance_contrast=True
             )
 
-            # Extract features
             features_dict = feature_extractor.extract_all_features(preprocessed)
             features_array = np.array([[features_dict[name] for name in feature_names]])
 
-            # Scale and predict
             features_scaled = scaler.transform(features_array)
             hemoglobin = float(np.clip(ridge_model.predict(features_scaled)[0], 6.0, 18.0))
 
@@ -324,7 +288,6 @@ async def predict_batch(files: list[UploadFile] = File(...)):
 
 @app.get("/models/status")
 async def models_status():
-    """Get detailed model status."""
     return {
         "ridge_model": {
             "loaded": ridge_model is not None,

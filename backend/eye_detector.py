@@ -1,18 +1,10 @@
-"""
-Eye Detection Module for HemoLens
-Uses Haar Cascade to detect eyes in images
-"""
-
 import cv2
 import numpy as np
 from pathlib import Path
 
 
 class EyeDetector:
-    """Detect eyes in images using Haar Cascade."""
-
     def __init__(self):
-        """Initialize eye cascade classifier."""
         cascade_path = cv2.data.haarcascades + 'haarcascade_eye.xml'
         self.eye_cascade = cv2.CascadeClassifier(cascade_path)
 
@@ -20,15 +12,6 @@ class EyeDetector:
         self.face_cascade = cv2.CascadeClassifier(face_cascade_path)
 
     def detect_eyes(self, image: np.ndarray) -> bool:
-        """
-        Detect if eyes are present in image.
-
-        Args:
-            image: Input image (RGB or BGR)
-
-        Returns:
-            True if eyes detected, False otherwise
-        """
         if len(image.shape) == 3:
             gray = cv2.cvtColor(image.astype(np.uint8), cv2.COLOR_RGB2GRAY)
         else:
@@ -62,16 +45,6 @@ class EyeDetector:
         return False
 
     def get_eye_quality_score(self, image: np.ndarray) -> float:
-        """
-        Get a quality score for eye detection (0-1).
-        Higher score = better eye visibility.
-
-        Args:
-            image: Input image
-
-        Returns:
-            Quality score (0-1)
-        """
         if len(image.shape) == 3:
             gray = cv2.cvtColor(image.astype(np.uint8), cv2.COLOR_RGB2GRAY)
         else:
@@ -96,15 +69,6 @@ class EyeDetector:
 
 
 def get_hemoglobin_status(value: float) -> dict:
-    """
-    Classify hemoglobin level as Low, Safe, or High.
-
-    Args:
-        value: Hemoglobin value in g/dL
-
-    Returns:
-        Dictionary with status, color, and message
-    """
     if value < 12.0:
         return {
             "status": "LOW",

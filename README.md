@@ -1,128 +1,102 @@
-# HemoLens - Non-invasive Hemoglobin Detection
+# HemoLens
 
-Real-time hemoglobin estimation from eye images using machine learning and mobile app integration.
+Non-invasive hemoglobin estimation from eye images using machine learning. FastAPI backend with React Native (Expo) mobile app.
 
-## Project Structure
+## Structure
 
 ```
-hemolens_project/
-├── hemolens/                 # Backend API (FastAPI)
-│   ├── app.py               # Main FastAPI application
-│   ├── eye_detector.py      # Eye detection and health classification
-│   ├── feature_extraction.py # 46-feature engineering pipeline
-│   ├── preprocessing.py     # Image preprocessing utilities
-│   ├── requirements.txt     # Python dependencies
-│   └── models/              # Trained ML models
-│       ├── hemolens_ridge_model.pkl
-│       ├── hemolens_gb_model.pkl
-│       └── scaler.pkl
-│
-├── hemolens_mobile/          # Mobile App (React Native + Expo)
-│   ├── App.js               # Main app (gallery, camera, real-time)
-│   ├── RealtimeCamera.js    # Real-time camera component
-│   ├── config.js             # API base URL (use EXPO_PUBLIC_API_URL for local)
+├── backend/                 # FastAPI API
+│   ├── app.py              # Main application
+│   ├── eye_detector.py     # Eye detection & health classification
+│   ├── feature_extraction.py
+│   ├── preprocessing.py
+│   ├── requirements.txt
+│   └── models/             # Trained models (.pkl)
+├── mobile/                  # React Native + Expo app
+│   ├── App.js
+│   ├── RealtimeCamera.js
+│   ├── config.js
 │   ├── package.json
-│   └── app.json             # Expo configuration
-│
-├── .gitignore
+│   └── app.json
 ├── Dockerfile
 ├── render.yaml
 └── README.md
 ```
 
-## Backend Setup
+## Backend
 
-### Requirements
-- Python 3.12+
-- FastAPI 0.104+
-- OpenCV, NumPy, scikit-learn, Pillow
-
-### Installation
+### Setup
 
 ```bash
-cd hemolens_project/hemolens
+cd backend
 pip install -r requirements.txt
 ```
 
-### Run Server
+### Run
 
 ```bash
 python app.py
 ```
 
-Server runs on `http://localhost:8000`.
+Server: `http://localhost:8000`
 
-**Quick local test:** `curl http://localhost:8000/health` should return `{"status":"healthy",...}`.
+### API
 
-API Endpoints:
-- `GET /health` - Health check
-- `GET /info` - Model information
-- `POST /predict` - Single image prediction with eye detection
-- `POST /predict/batch` - Batch predictions
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/health` | Health check |
+| GET | `/info` | Model info |
+| POST | `/predict` | Single image prediction |
+| POST | `/predict/batch` | Batch predictions |
 
-## Mobile App Setup
+## Mobile
 
-### Requirements
-- Node.js 16+
-- Expo CLI
-
-### Installation
+### Setup
 
 ```bash
-cd hemolens_project/hemolens_mobile
+cd mobile
 npm install
 ```
 
-### Run App
+### Run
 
 ```bash
 npx expo start
 ```
 
-Scan QR code with Expo Go app on your phone to test.
-
-### Using a local backend
-
-Set the API URL via environment variable (e.g. in `.env` or when starting):
+### Local backend
 
 ```bash
-EXPO_PUBLIC_API_URL=http://YOUR_LOCAL_IP:8000 npx expo start
+EXPO_PUBLIC_API_URL=http://YOUR_IP:8000 npx expo start
 ```
-
-Replace `YOUR_LOCAL_IP` with your machine’s LAN IP so the device can reach the backend.
-
-## Model Details
-
-- **Algorithm**: Ridge Regression with 46 features
-- **Performance**: R² = 0.6267, MAE = 0.96 g/dL
-- **Input**: Eye images (palpebral conjunctiva)
-- **Output**: Hemoglobin level + health status classification
-
-## Features
-
-- **Eye Detection**: Haar Cascade classifiers for strict eye validation
-- **46-Feature Pipeline**: RGB, LAB, HSV, YCrCb, Statistical, Edge, Contrast, Histogram
-- **Real-time Processing**: Continuous frame capture every 1.5s with rolling average
-- **Health Classification**: LOW / BORDERLINE / SAFE / HIGH with color-coded UI
 
 ## Deployment
 
-### Backend on Render
+### Render
 
-1. Connect this repo to [Render](https://render.com) and create a **Web Service** from the blueprint (`hemolens_project/render.yaml`).
-2. Set **Root Directory** to `hemolens_project` (the directory that contains `render.yaml` and the `hemolens/` folder).
-3. Push to your main branch; Render will auto-deploy.
+1. Connect repo to [Render](https://render.com)
+2. Create Web Service from `render.yaml`
+3. Set Root Directory to repository root
+4. Deploy
+
+### Docker
 
 ```bash
-git remote add origin https://github.com/YOUR_USERNAME/hemolens_project.git
-git push -u origin main
+docker build -t hemolens .
+docker run -p 8080:8080 hemolens
 ```
 
-The mobile app uses the deployed API URL by default (see `hemolens_mobile/config.js`). Override with `EXPO_PUBLIC_API_URL` for a custom backend.
+## Model
+
+- **Algorithm**: Ridge Regression (46 features)
+- **Performance**: R² = 0.6267, MAE = 0.96 g/dL
+- **Features**: RGB, LAB, HSV, YCrCb, statistical, edge, contrast, histogram
 
 ## WHO Guidelines
 
-- **Low**: < 12.0 g/dL (Red)
-- **Borderline**: 12.0-13.5 g/dL (Amber)
-- **Safe**: 13.5-17.5 g/dL (Green)
-- **High**: > 17.5 g/dL (Orange)
+| Status | Range (g/dL) |
+|--------|--------------|
+| Low | < 12.0 |
+| Borderline | 12.0–13.5 |
+| Safe | 13.5–17.5 |
+| High | > 17.5 |

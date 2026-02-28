@@ -14,7 +14,6 @@ import axios from 'axios';
 import RealtimeCamera from './RealtimeCamera';
 import { API_BASE_URL } from './config';
 
-// Level label and insights based on WHO classification (g/dL)
 function getLevelLabel(status) {
   const labels = { LOW: 'Low', BORDERLINE: 'Borderline', SAFE: 'Normal', HIGH: 'High' };
   return labels[status] || status;
@@ -55,7 +54,6 @@ export default function App() {
   const [apiStatus, setApiStatus] = useState('unknown');
   const [useRealtimeMode, setUseRealtimeMode] = useState(false);
 
-  // Check API status on app start
   React.useEffect(() => {
     checkApiHealth();
   }, []);
@@ -168,7 +166,6 @@ export default function App() {
     }
   };
 
-  // Show realtime camera if toggled
   if (useRealtimeMode) {
     return (
       <RealtimeCamera onClose={() => setUseRealtimeMode(false)} />
@@ -177,7 +174,6 @@ export default function App() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-      {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <View style={styles.logoWrap}>
@@ -194,7 +190,6 @@ export default function App() {
         <Text style={styles.subtitle}>Non-invasive hemoglobin estimate from eye images</Text>
       </View>
 
-      {/* Image / Placeholder */}
       <View style={styles.section}>
         {image ? (
           <View style={styles.imageCard}>
@@ -244,7 +239,6 @@ export default function App() {
         </TouchableOpacity>
       </View>
 
-      {/* Result */}
       {result && (
         <View style={[styles.resultCard, result.healthColor && { borderLeftWidth: 4, borderLeftColor: result.healthColor }]}>
           <View style={styles.resultHead}>
@@ -287,7 +281,6 @@ export default function App() {
   );
 }
 
-// Modern medical app palette
 const colors = {
   primary: '#0D9488',
   primaryLight: '#CCFBF1',
