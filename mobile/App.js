@@ -14,41 +14,51 @@ import axios from 'axios';
 import RealtimeCamera from './RealtimeCamera';
 import { API_BASE_URL } from './config';
 
+const MODALITIES = [
+  { key: 'eye', label: 'Eye', hint: 'Palpebral conjunctiva, well lit' },
+  { key: 'nail', label: 'Nail', hint: 'Fingernail bed, clear focus' },
+  { key: 'palm', label: 'Palm', hint: 'Open palm, fingers spread' },
+];
+
 function getLevelLabel(status) {
   const labels = { LOW: 'Low', BORDERLINE: 'Borderline', SAFE: 'Normal', HIGH: 'High' };
   return labels[status] || status;
 }
 
-function getInsightsForStatus(status, value) {
+function getInsightsForStatus(status) {
   const insights = {
     LOW: [
       'Possible anemia. Consider a blood test to confirm.',
-      'Eat iron-rich foods: leafy greens, beans, fortified cereals, lean meat.',
-      'Vitamin C helps iron absorption — pair with citrus or peppers.',
-      'Consult a doctor for diagnosis and treatment plan.',
+      'Eat iron-rich foods and pair with vitamin C for absorption.',
+      'Consult a doctor for diagnosis and treatment.',
     ],
     BORDERLINE: [
-      'Level is below optimal. Good time to improve diet and habits.',
-      'Include iron-rich foods and avoid excess tea/coffee with meals.',
-      'Get a lab test if you have fatigue, weakness, or dizziness.',
-      'Monitor with follow-up checks in a few weeks.',
+      'Below optimal range. Improve diet and monitor symptoms.',
+      'Avoid tea/coffee with iron-rich meals.',
+      'Recheck in a few weeks or get a lab test.',
     ],
     SAFE: [
-      'Your level is in the healthy range (WHO: 13.5–17.5 g/dL for adults).',
-      'Keep a balanced diet with iron, folate, and B12.',
-      'Stay hydrated and maintain regular health check-ups.',
+      'Within healthy range (WHO: 13.5–17.5 g/dL for adults).',
+      'Maintain balanced diet with iron, folate, and B12.',
     ],
     HIGH: [
-      'High hemoglobin can be due to dehydration, smoking, or other conditions.',
-      'Stay well hydrated and avoid smoking.',
-      'Consult a doctor to rule out polycythemia or other causes.',
+      'High hemoglobin may relate to dehydration or other conditions.',
+      'Stay hydrated and consult a doctor if concerned.',
     ],
   };
   return insights[status] || [];
 }
 
+function appendImageToFormData(formData, fieldName, asset) {
+  formData.append(fieldName, {
+    uri: asset.uri,
+    type: 'image/jpeg',
+    name: asset.fileName || `${fieldName}.jpg`,
+  });
+}
+
 export default function App() {
-  const [image, setImage] = useState(null);
+  const [images, setImages] = useState({ eye: null, nail: null, palm: null });
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [apiStatus, setApiStatus] = useState('unknown');
@@ -60,56 +70,42 @@ export default function App() {
 
   const checkApiHealth = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/health`, {
-        timeout: 10000,
-      });
+      const response = await axios.get(`${API_BASE_URL}/health`, { timeout: 10000 });
       setApiStatus(response.data.status === 'healthy' ? 'connected' : 'error');
     } catch (error) {
       setApiStatus('disconnected');
-      console.log('API Health Check:', error.message);
     }
   };
 
-  const pickImageFromGallery = async () => {
+  const pickImage = async (modality, useCamera) => {
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({
+      const launcher = useCamera
+        ? ImagePicker.launchCameraAsync
+        : ImagePicker.launchImageLibraryAsync;
+      const picked = await launcher({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: false,
-        aspect: [4, 3],
         quality: 0.8,
-        base64: true,
       });
-
-      if (!result.canceled) {
+      if (!picked.canceled) {
         setResult(null);
-        setImage(result.assets[0]);
+        setImages((prev) => ({ ...prev, [modality]: picked.assets[0] }));
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to pick image: ' + error.message);
+      Alert.alert('Error', error.message);
     }
   };
 
-  const pickImageFromCamera = async () => {
-    try {
-      const result = await ImagePicker.launchCameraAsync({
-        allowsEditing: false,
-        aspect: [4, 3],
-        quality: 0.8,
-        base64: true,
-      });
-
-      if (!result.canceled) {
-        setResult(null);
-        setImage(result.assets[0]);
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to capture image: ' + error.message);
-    }
+  const clearModality = (modality) => {
+    setImages((prev) => ({ ...prev, [modality]: null }));
+    setResult(null);
   };
 
-  const predictHemoglobin = async () => {
-    if (!image) {
-      Alert.alert('Error', 'Please select an image first');
+  const hasAnyImage = MODALITIES.some((m) => images[m.key]);
+
+  const predictMultimodal = async () => {
+    if (!hasAnyImage) {
+      Alert.alert('Add images', 'Add at least one of: eye, nail, or palm.');
       return;
     }
 
@@ -118,129 +114,140 @@ export default function App() {
 
     try {
       const formData = new FormData();
-      formData.append('file', {
-        uri: image.uri,
-        type: 'image/jpeg',
-        name: image.filename || 'photo.jpg',
+      if (images.eye) appendImageToFormData(formData, 'eye_file', images.eye);
+      if (images.nail) appendImageToFormData(formData, 'nail_file', images.nail);
+      if (images.palm) appendImageToFormData(formData, 'palm_file', images.palm);
+
+      const response = await axios.post(`${API_BASE_URL}/predict/multimodal`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 120000,
       });
 
-      const response = await axios.post(
-        `${API_BASE_URL}/predict`,
-        formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-          timeout: 60000,
-        }
-      );
-
       if (response.data.status === 'no_eyes_detected') {
-        Alert.alert(
-          'No eyes detected',
-          response.data.message || 'Please provide a clear image of your eye.'
-        );
+        Alert.alert('Eye not detected', response.data.message || 'Try a clearer eye image or add nail/palm.');
         return;
       }
 
       setResult({
         hemoglobin: response.data.hemoglobin_estimate,
         unit: response.data.unit || 'g/dL',
-        status: response.data.status,
         healthStatus: response.data.health_status,
         healthMessage: response.data.health_message,
         healthColor: response.data.health_color,
+        modalitiesUsed: response.data.modalities_used || [],
         processingTime: response.data.processing_time_ms,
       });
-
       setApiStatus('connected');
     } catch (error) {
+      const detail = error.response?.data?.detail || error.message;
+      Alert.alert('Prediction error', String(detail));
       setApiStatus('error');
-      console.error('Prediction error:', error);
-      Alert.alert(
-        'Prediction Error',
-        `Failed to get prediction: ${error.message || 'Unknown error'}`
-      );
     } finally {
       setLoading(false);
     }
   };
 
   if (useRealtimeMode) {
-    return (
-      <RealtimeCamera onClose={() => setUseRealtimeMode(false)} />
-    );
+    return <RealtimeCamera onClose={() => setUseRealtimeMode(false)} />;
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <View style={styles.logoWrap}>
             <View style={styles.logoIcon} />
             <Text style={styles.title}>HemoLens</Text>
           </View>
-          <View style={[styles.statusPill, { backgroundColor: apiStatus === 'connected' ? '#D1FAE5' : apiStatus === 'disconnected' ? '#FEE2E2' : '#FEF3C7' }]}>
-            <View style={[styles.statusDot, { backgroundColor: apiStatus === 'connected' ? '#059669' : apiStatus === 'disconnected' ? '#DC2626' : '#D97706' }]} />
-            <Text style={[styles.statusText, { color: apiStatus === 'connected' ? '#047857' : apiStatus === 'disconnected' ? '#B91C1C' : '#B45309' }]}>
+          <View
+            style={[
+              styles.statusPill,
+              {
+                backgroundColor:
+                  apiStatus === 'connected' ? '#D1FAE5' : apiStatus === 'disconnected' ? '#FEE2E2' : '#FEF3C7',
+              },
+            ]}
+          >
+            <View
+              style={[
+                styles.statusDot,
+                {
+                  backgroundColor:
+                    apiStatus === 'connected' ? '#059669' : apiStatus === 'disconnected' ? '#DC2626' : '#D97706',
+                },
+              ]}
+            />
+            <Text style={styles.statusText}>
               {apiStatus === 'connected' ? 'Connected' : apiStatus === 'disconnected' ? 'Offline' : 'Checking…'}
             </Text>
           </View>
         </View>
-        <Text style={styles.subtitle}>Non-invasive hemoglobin estimate from eye images</Text>
+        <Text style={styles.subtitle}>Multimodal anemia screening — eye, nail & palm</Text>
       </View>
 
       <View style={styles.section}>
-        {image ? (
-          <View style={styles.imageCard}>
-            <Image
-              source={
-                image.base64
-                  ? { uri: `data:image/jpeg;base64,${image.base64}` }
-                  : { uri: image.uri }
-              }
-              style={styles.image}
-              contentFit="cover"
-            />
-            <Text style={styles.imageMeta}>{Math.round((image.fileSize || 0) / 1024)} KB</Text>
-          </View>
-        ) : (
-          <View style={styles.placeholderCard}>
-            <View style={styles.placeholderIcon} />
-            <Text style={styles.placeholderTitle}>Add eye image</Text>
-            <Text style={styles.placeholderSub}>Camera or gallery — palpebral conjunctiva works best</Text>
-          </View>
-        )}
+        {MODALITIES.map((mod) => {
+          const asset = images[mod.key];
+          return (
+            <View key={mod.key} style={styles.modalityCard}>
+              <View style={styles.modalityHead}>
+                <Text style={styles.modalityLabel}>{mod.label}</Text>
+                {asset && (
+                  <TouchableOpacity onPress={() => clearModality(mod.key)}>
+                    <Text style={styles.clearText}>Clear</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              {asset ? (
+                <Image source={{ uri: asset.uri }} style={styles.modalityImage} contentFit="cover" />
+              ) : (
+                <View style={styles.modalityPlaceholder}>
+                  <Text style={styles.modalityHint}>{mod.hint}</Text>
+                </View>
+              )}
+              <View style={styles.modalityActions}>
+                <TouchableOpacity
+                  style={styles.modalityBtn}
+                  onPress={() => pickImage(mod.key, true)}
+                >
+                  <Text style={styles.modalityBtnText}>Camera</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalityBtn, styles.modalityBtnAlt]}
+                  onPress={() => pickImage(mod.key, false)}
+                >
+                  <Text style={styles.modalityBtnTextAlt}>Gallery</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          );
+        })}
 
-        <View style={styles.actionsRow}>
-          <TouchableOpacity style={[styles.actionBtn, styles.actionCamera]} onPress={pickImageFromCamera} activeOpacity={0.8}>
-            <Text style={styles.actionBtnText}>Camera</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionBtn, styles.actionGallery]} onPress={pickImageFromGallery} activeOpacity={0.8}>
-            <Text style={styles.actionBtnText}>Gallery</Text>
-          </TouchableOpacity>
-        </View>
-
-        <TouchableOpacity style={[styles.actionBtn, styles.actionRealtime]} onPress={() => setUseRealtimeMode(true)} activeOpacity={0.8}>
-          <Text style={styles.actionBtnTextOutlined}>Live detection</Text>
+        <TouchableOpacity
+          style={styles.liveBtn}
+          onPress={() => setUseRealtimeMode(true)}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.liveBtnText}>Live eye detection</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.primaryBtn, (!image || loading) && styles.primaryBtnDisabled]}
-          onPress={predictHemoglobin}
-          disabled={!image || loading}
+          style={[styles.primaryBtn, (!hasAnyImage || loading) && styles.primaryBtnDisabled]}
+          onPress={predictMultimodal}
+          disabled={!hasAnyImage || loading}
           activeOpacity={0.85}
         >
           {loading ? (
             <ActivityIndicator color="#FFF" size="small" />
           ) : (
-            <Text style={styles.primaryBtnText}>Analyze hemoglobin</Text>
+            <Text style={styles.primaryBtnText}>Analyze (multimodal)</Text>
           )}
         </TouchableOpacity>
+        <Text style={styles.helpText}>Add one or more images for best accuracy with all three.</Text>
       </View>
 
       {result && (
-        <View style={[styles.resultCard, result.healthColor && { borderLeftWidth: 4, borderLeftColor: result.healthColor }]}>
+        <View style={[styles.resultCard, result.healthColor && { borderLeftColor: result.healthColor }]}>
           <View style={styles.resultHead}>
             <Text style={styles.resultHeadTitle}>Result</Text>
             {result.processingTime != null && (
@@ -248,20 +255,25 @@ export default function App() {
             )}
           </View>
           <View style={styles.resultMain}>
-            <Text style={styles.resultValue}>{result.hemoglobin.toFixed(1)} <Text style={styles.resultUnit}>{result.unit}</Text></Text>
+            <Text style={styles.resultValue}>
+              {result.hemoglobin.toFixed(1)} <Text style={styles.resultUnit}>{result.unit}</Text>
+            </Text>
             {result.healthStatus && (
-              <View style={[styles.levelBadge, result.healthColor && { backgroundColor: result.healthColor }]}>
+              <View style={[styles.levelBadge, { backgroundColor: result.healthColor || colors.success }]}>
                 <Text style={styles.levelBadgeText}>{getLevelLabel(result.healthStatus)}</Text>
               </View>
             )}
           </View>
-          {result.healthMessage && (
-            <Text style={styles.healthMessage}>{result.healthMessage}</Text>
+          {result.modalitiesUsed?.length > 0 && (
+            <Text style={styles.modalitiesUsed}>
+              Used: {result.modalitiesUsed.join(' · ')}
+            </Text>
           )}
-          {getInsightsForStatus(result.healthStatus, result.hemoglobin).length > 0 && (
+          {result.healthMessage && <Text style={styles.healthMessage}>{result.healthMessage}</Text>}
+          {getInsightsForStatus(result.healthStatus).length > 0 && (
             <View style={styles.insightsBlock}>
               <Text style={styles.insightsTitle}>Insights</Text>
-              {getInsightsForStatus(result.healthStatus, result.hemoglobin).map((line, idx) => (
+              {getInsightsForStatus(result.healthStatus).map((line, idx) => (
                 <View key={idx} style={styles.insightRow}>
                   <Text style={styles.insightBullet}>•</Text>
                   <Text style={styles.insightText}>{line}</Text>
@@ -275,7 +287,7 @@ export default function App() {
 
       <View style={styles.footer}>
         <Text style={styles.footerText}>HemoLens</Text>
-        <Text style={styles.footerSub}>Estimate only · not a diagnosis</Text>
+        <Text style={styles.footerSub}>Screening estimate only · not a diagnosis</Text>
       </View>
     </ScrollView>
   );
@@ -291,297 +303,107 @@ const colors = {
   textMuted: '#94A3B8',
   border: '#E2E8F0',
   success: '#059669',
-  warning: '#D97706',
-  error: '#DC2626',
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  content: {
-    paddingBottom: 40,
-  },
+  container: { flex: 1, backgroundColor: colors.background },
+  content: { paddingBottom: 40 },
   header: {
     backgroundColor: colors.surface,
     paddingTop: 48,
-    paddingBottom: 24,
+    paddingBottom: 20,
     paddingHorizontal: 24,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  headerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  logoWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  logoIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: colors.primary,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: colors.text,
-    letterSpacing: -0.5,
-  },
-  statusPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    gap: 6,
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  subtitle: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    lineHeight: 20,
-  },
-  section: {
-    paddingHorizontal: 24,
-    paddingTop: 24,
-  },
-  imageCard: {
+  headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  logoWrap: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  logoIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: colors.primary },
+  title: { fontSize: 24, fontWeight: '700', color: colors.text },
+  statusPill: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 20, gap: 6 },
+  statusDot: { width: 8, height: 8, borderRadius: 4 },
+  statusText: { fontSize: 12, fontWeight: '600' },
+  subtitle: { fontSize: 14, color: colors.textSecondary, lineHeight: 20 },
+  section: { paddingHorizontal: 24, paddingTop: 20 },
+  modalityCard: {
     backgroundColor: colors.surface,
-    borderRadius: 16,
-    overflow: 'hidden',
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  image: {
-    width: '100%',
-    height: 260,
-    backgroundColor: colors.border,
-  },
-  imageMeta: {
+    borderRadius: 14,
     padding: 12,
-    fontSize: 12,
-    color: colors.textMuted,
-    textAlign: 'center',
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  placeholderCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: 32,
+  modalityHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  modalityLabel: { fontSize: 16, fontWeight: '700', color: colors.text },
+  clearText: { fontSize: 13, color: colors.primary, fontWeight: '600' },
+  modalityImage: { width: '100%', height: 140, borderRadius: 10, backgroundColor: colors.border },
+  modalityPlaceholder: {
+    height: 100,
+    borderRadius: 10,
+    backgroundColor: colors.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+  },
+  modalityHint: { fontSize: 12, color: colors.textSecondary, textAlign: 'center' },
+  modalityActions: { flexDirection: 'row', gap: 10, marginTop: 10 },
+  modalityBtn: {
+    flex: 1,
+    backgroundColor: colors.primary,
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  modalityBtnAlt: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  modalityBtnText: { color: '#FFF', fontWeight: '600', fontSize: 14 },
+  modalityBtnTextAlt: { color: colors.text, fontWeight: '600', fontSize: 14 },
+  liveBtn: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingVertical: 12,
     alignItems: 'center',
     marginBottom: 16,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: colors.border,
-  },
-  placeholderIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.primaryLight,
-    marginBottom: 12,
-  },
-  placeholderTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: 4,
-  },
-  placeholderSub: {
-    fontSize: 13,
-    color: colors.textMuted,
-    textAlign: 'center',
-  },
-  actionsRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 12,
-  },
-  actionBtn: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionCamera: {
-    backgroundColor: colors.primary,
-  },
-  actionGallery: {
-    backgroundColor: colors.textSecondary,
-  },
-  actionRealtime: {
     backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: 20,
   },
-  actionBtnText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.surface,
-  },
-  actionRealtime: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: 20,
-  },
-  actionBtnTextOutlined: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.text,
-  },
+  liveBtnText: { fontSize: 15, fontWeight: '600', color: colors.text },
   primaryBtn: {
     backgroundColor: colors.primary,
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
-    justifyContent: 'center',
     minHeight: 52,
+    justifyContent: 'center',
   },
-  primaryBtnDisabled: {
-    backgroundColor: colors.textMuted,
-    opacity: 0.7,
-  },
-  primaryBtnText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.surface,
-  },
+  primaryBtnDisabled: { backgroundColor: colors.textMuted, opacity: 0.7 },
+  primaryBtnText: { fontSize: 16, fontWeight: '600', color: '#FFF' },
+  helpText: { fontSize: 12, color: colors.textMuted, textAlign: 'center', marginTop: 10 },
   resultCard: {
     marginHorizontal: 24,
-    marginTop: 28,
+    marginTop: 8,
     backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 20,
     borderLeftWidth: 4,
     borderLeftColor: colors.success,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
   },
-  resultHead: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  resultHeadTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.textMuted,
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-  },
-  resultMeta: {
-    fontSize: 12,
-    color: colors.textMuted,
-  },
-  resultMain: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 12,
-  },
-  resultValue: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: colors.text,
-    letterSpacing: -0.5,
-  },
-  resultUnit: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.textSecondary,
-  },
-  levelBadge: {
-    backgroundColor: colors.success,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-  },
-  levelBadgeText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.surface,
-  },
-  healthMessage: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    lineHeight: 22,
-    marginBottom: 16,
-  },
-  insightsBlock: {
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 12,
-  },
-  insightsTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.textMuted,
-    letterSpacing: 0.3,
-    marginBottom: 10,
-    textTransform: 'uppercase',
-  },
-  insightRow: {
-    flexDirection: 'row',
-    marginBottom: 8,
-    alignItems: 'flex-start',
-  },
-  insightBullet: {
-    fontSize: 12,
-    color: colors.primary,
-    marginRight: 8,
-    marginTop: 1,
-  },
-  insightText: {
-    flex: 1,
-    fontSize: 13,
-    color: colors.textSecondary,
-    lineHeight: 20,
-  },
-  whoRef: {
-    fontSize: 11,
-    color: colors.textMuted,
-    fontStyle: 'italic',
-  },
-  footer: {
-    marginTop: 40,
-    paddingVertical: 24,
-    alignItems: 'center',
-  },
-  footerText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.textMuted,
-  },
-  footerSub: {
-    fontSize: 11,
-    color: colors.textMuted,
-    marginTop: 4,
-  },
+  resultHead: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+  resultHeadTitle: { fontSize: 13, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase' },
+  resultMeta: { fontSize: 12, color: colors.textMuted },
+  resultMain: { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: 10, marginBottom: 8 },
+  resultValue: { fontSize: 32, fontWeight: '700', color: colors.text },
+  resultUnit: { fontSize: 16, fontWeight: '600', color: colors.textSecondary },
+  levelBadge: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8 },
+  levelBadgeText: { fontSize: 13, fontWeight: '700', color: '#FFF' },
+  modalitiesUsed: { fontSize: 13, color: colors.primary, fontWeight: '600', marginBottom: 8 },
+  healthMessage: { fontSize: 14, color: colors.textSecondary, lineHeight: 22, marginBottom: 12 },
+  insightsBlock: { backgroundColor: colors.background, borderRadius: 12, padding: 14, marginBottom: 12 },
+  insightsTitle: { fontSize: 12, fontWeight: '700', color: colors.textMuted, marginBottom: 8, textTransform: 'uppercase' },
+  insightRow: { flexDirection: 'row', marginBottom: 6 },
+  insightBullet: { color: colors.primary, marginRight: 8 },
+  insightText: { flex: 1, fontSize: 13, color: colors.textSecondary, lineHeight: 20 },
+  whoRef: { fontSize: 11, color: colors.textMuted, fontStyle: 'italic' },
+  footer: { marginTop: 32, paddingVertical: 24, alignItems: 'center' },
+  footerText: { fontSize: 13, fontWeight: '600', color: colors.textMuted },
+  footerSub: { fontSize: 11, color: colors.textMuted, marginTop: 4 },
 });

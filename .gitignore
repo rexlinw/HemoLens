@@ -1,5 +1,8 @@
 .DS_Store
 *.log
+data/
+training_log.txt
+backend/test_non_eye.png
 
 # Python
 __pycache__/

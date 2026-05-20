@@ -1,0 +1,17 @@
+{
+  "model_type": "GradientBoosting",
+  "modalities": [
+    "eye",
+    "nail",
+    "palm"
+  ],
+  "feature_dims": {
+    "eye": 46,
+    "nail": 25,
+    "palm": 26
+  },
+  "total_features": 97,
+  "r2": 0.547,
+  "mae": 1.69,
+  "training_samples": 6416
+}

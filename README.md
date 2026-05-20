@@ -46,8 +46,16 @@ Server: `http://localhost:8000`
 |--------|----------|-------------|
 | GET | `/health` | Health check |
 | GET | `/info` | Model info |
-| POST | `/predict` | Single image prediction |
-| POST | `/predict/batch` | Batch predictions |
+| POST | `/predict` | Single eye image |
+| POST | `/predict/multimodal` | Eye, nail, and/or palm images (`eye_file`, `nail_file`, `palm_file`) |
+| POST | `/predict/batch` | Batch eye predictions |
+
+### Train multimodal model
+
+```bash
+cd backend
+python train_multimodal_production.py
+```
 
 ## Mobile
 
