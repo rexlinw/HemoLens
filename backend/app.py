@@ -265,6 +265,7 @@ async def predict(file: UploadFile = File(...)):
         )
 
 
+@app.post("/predict-multimodal")
 @app.post("/predict/multimodal")
 async def predict_multimodal_endpoint(
     eye_file: Optional[UploadFile] = File(None),

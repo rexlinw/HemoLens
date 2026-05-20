@@ -103,6 +103,20 @@ export default function App() {
 
   const hasAnyImage = MODALITIES.some((m) => images[m.key]);
 
+  const predictEyeOnly = async () => {
+    const formData = new FormData();
+    formData.append('file', {
+      uri: images.eye.uri,
+      type: 'image/jpeg',
+      name: 'eye.jpg',
+    });
+    const response = await axios.post(`${API_BASE_URL}/predict`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 120000,
+    });
+    return response;
+  };
+
   const predictMultimodal = async () => {
     if (!hasAnyImage) {
       Alert.alert('Add images', 'Add at least one of: eye, nail, or palm.');
@@ -113,15 +127,75 @@ export default function App() {
     setResult(null);
 
     try {
-      const formData = new FormData();
-      if (images.eye) appendImageToFormData(formData, 'eye_file', images.eye);
-      if (images.nail) appendImageToFormData(formData, 'nail_file', images.nail);
-      if (images.palm) appendImageToFormData(formData, 'palm_file', images.palm);
+      let healthData = {};
+      try {
+        const healthRes = await axios.get(`${API_BASE_URL}/health`, { timeout: 10000 });
+        healthData = healthRes.data || {};
+      } catch (_) {
+        /* use multimodal endpoint and fall back if needed */
+      }
 
-      const response = await axios.post(`${API_BASE_URL}/predict/multimodal`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-        timeout: 120000,
-      });
+      const multimodalAvailable = healthData.multimodal_loaded === true;
+      const hasNailOrPalm = Boolean(images.nail || images.palm);
+      let response;
+
+      const tryMultimodalPost = async () => {
+        const formData = new FormData();
+        if (images.eye) appendImageToFormData(formData, 'eye_file', images.eye);
+        if (images.nail) appendImageToFormData(formData, 'nail_file', images.nail);
+        if (images.palm) appendImageToFormData(formData, 'palm_file', images.palm);
+
+        const urls = [
+          `${API_BASE_URL}/predict/multimodal`,
+          `${API_BASE_URL}/predict-multimodal`,
+        ];
+        let lastError;
+        for (const url of urls) {
+          try {
+            return await axios.post(url, formData, {
+              headers: { 'Content-Type': 'multipart/form-data' },
+              timeout: 120000,
+            });
+          } catch (err) {
+            lastError = err;
+          }
+        }
+        throw lastError;
+      };
+
+      const isLegacyApiError = (err) => {
+        const status = err?.response?.status;
+        const detail = err?.response?.data?.detail;
+        return (
+          status === 405 ||
+          status === 404 ||
+          (typeof detail === 'string' && detail.toLowerCase().includes('method not allowed'))
+        );
+      };
+
+      if (multimodalAvailable || hasNailOrPalm) {
+        try {
+          response = await tryMultimodalPost();
+        } catch (multimodalError) {
+          if (isLegacyApiError(multimodalError) && images.eye) {
+            Alert.alert(
+              'Eye-only mode',
+              'Server is still on API v1. Using eye image only. Redeploy Render from latest main for nail+palm.'
+            );
+            response = await predictEyeOnly();
+          } else {
+            throw multimodalError;
+          }
+        }
+      } else if (images.eye) {
+        response = await predictEyeOnly();
+      } else {
+        Alert.alert(
+          'Server update required',
+          'Redeploy the backend on Render from the latest main branch to enable nail and palm analysis.'
+        );
+        return;
+      }
 
       if (response.data.status === 'no_eyes_detected') {
         Alert.alert('Eye not detected', response.data.message || 'Try a clearer eye image or add nail/palm.');
@@ -134,7 +208,7 @@ export default function App() {
         healthStatus: response.data.health_status,
         healthMessage: response.data.health_message,
         healthColor: response.data.health_color,
-        modalitiesUsed: response.data.modalities_used || [],
+        modalitiesUsed: response.data.modalities_used || (images.eye ? ['eye'] : []),
         processingTime: response.data.processing_time_ms,
       });
       setApiStatus('connected');

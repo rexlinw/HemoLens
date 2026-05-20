@@ -4,8 +4,6 @@ services:
     env: python
     plan: free
     pythonVersion: 3.10
+    rootDir: .
     buildCommand: pip install -r backend/requirements.txt
-    startCommand: cd backend && uvicorn app:app --host 0.0.0.0 --port 8080
-    envVars:
-      - key: PORT
-        value: 8080
+    startCommand: cd backend && uvicorn app:app --host 0.0.0.0 --port $PORT
