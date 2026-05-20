@@ -97,7 +97,8 @@ docker run -p 8080:8080 hemolens
 ## Model
 
 - **Algorithm**: Ridge Regression (46 features)
-- **Performance**: R² = 0.6267, MAE = 0.96 g/dL
+- **Performance (multimodal eye+nail+palm)**: R² ≈ 0.85, MAE ≈ 0.58 g/dL (see `backend/models/multimodal_config.json`)
+- **Eye-only fallback**: R² ≈ 0.63, MAE ≈ 0.96 g/dL
 - **Features**: RGB, LAB, HSV, YCrCb, statistical, edge, contrast, histogram
 
 ## WHO Guidelines
