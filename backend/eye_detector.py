@@ -22,9 +22,9 @@ class EyeDetector:
 
         faces = self.face_cascade.detectMultiScale(
             gray,
-            scaleFactor=1.05,
-            minNeighbors=7,
-            minSize=(50, 50)
+            scaleFactor=1.08,
+            minNeighbors=8,
+            minSize=(60, 60),
         )
 
         if len(faces) == 0:
@@ -34,9 +34,9 @@ class EyeDetector:
             roi_gray = gray[y:y + h, x:x + w]
             eyes = self.eye_cascade.detectMultiScale(
                 roi_gray,
-                scaleFactor=1.05,
-                minNeighbors=8,
-                minSize=(20, 20)
+                scaleFactor=1.08,
+                minNeighbors=10,
+                minSize=(24, 24),
             )
 
             if len(eyes) >= 2:

@@ -13,6 +13,7 @@ from preprocessing import ImagePreprocessor
 from feature_extraction import FeatureExtractor
 from eye_detector import EyeDetector, get_hemoglobin_status
 from multimodal import load_multimodal_artifacts, predict_multimodal
+from image_validator import validate_eye, validate_multimodal_inputs
 
 app = FastAPI(
     title="HemoLens API v3.0",
@@ -45,7 +46,7 @@ multimodal_scaler = None
 multimodal_config = None
 models_loaded = False
 multimodal_loaded = False
-EYE_QUALITY_THRESHOLD = 0.5
+EYE_QUALITY_THRESHOLD = 0.65
 
 
 def decode_image_bytes(contents: bytes) -> np.ndarray:
@@ -202,24 +203,18 @@ async def predict(file: UploadFile = File(...)):
         contents = await file.read()
         image_array = decode_image_bytes(contents)
 
-        # Require both detection and minimum quality score to avoid false positives
-        eye_quality = eye_detector.get_eye_quality_score(image_array)
-        detected = eye_detector.detect_eyes(image_array)
+        validation = validate_eye(image_array, eye_detector)
+        print(f"[PREDICT] file={file.filename} valid={validation.valid} score={validation.score:.3f}")
 
-        # Log detection info for debugging
-        print(f"[PREDICT] file={file.filename} detected={detected} eye_quality={eye_quality:.3f}")
-
-        # Allow images that meet the eye-quality threshold even if detect_eyes() failed
-        if eye_quality < EYE_QUALITY_THRESHOLD and not detected:
-            print(f"[PREDICT] Rejected: low-quality or no eye (threshold={EYE_QUALITY_THRESHOLD})")
+        if not validation.valid:
             return {
-                "status": "no_eyes_detected",
-                "message": "❌ No clear eyes detected in image. Please provide a close-up, well-lit eye image.",
+                "status": "invalid_image",
+                "message": validation.message,
                 "hemoglobin_estimate": None,
                 "health_status": None,
                 "processing_time_ms": int((time.time() - start_time) * 1000),
                 "filename": file.filename,
-                "eye_quality_score": float(eye_quality)
+                "eye_quality_score": float(validation.score),
             }
 
         preprocessed = ImagePreprocessor.preprocess(
@@ -249,7 +244,7 @@ async def predict(file: UploadFile = File(...)):
         return {
             "status": "success",
             "hemoglobin_estimate": float(hemoglobin_estimate),
-            "eye_quality_score": float(eye_quality),
+            "eye_quality_score": float(validation.score),
             "unit": "g/dL",
             "health_status": health_status["status"],
             "health_message": health_status["message"],
@@ -292,17 +287,6 @@ async def predict_multimodal_endpoint(
         if eye_file and eye_file.filename:
             contents = await eye_file.read()
             eye_array = decode_image_bytes(contents)
-            eye_quality = float(eye_detector.get_eye_quality_score(eye_array))
-            detected = eye_detector.detect_eyes(eye_array)
-            if eye_quality < EYE_QUALITY_THRESHOLD and not detected:
-                return {
-                    "status": "no_eyes_detected",
-                    "message": "No clear eyes detected. Add nail/palm images or use a clearer eye photo.",
-                    "hemoglobin_estimate": None,
-                    "health_status": None,
-                    "processing_time_ms": int((time.time() - start_time) * 1000),
-                    "eye_quality_score": eye_quality,
-                }
 
         if nail_file and nail_file.filename:
             contents = await nail_file.read()
@@ -312,12 +296,33 @@ async def predict_multimodal_endpoint(
             contents = await palm_file.read()
             palm_array = decode_image_bytes(contents)
 
+        validation_results, accepted, error_msg = validate_multimodal_inputs(
+            eye_detector, eye=eye_array, nail=nail_array, palm=palm_array
+        )
+
+        if not accepted:
+            return {
+                "status": "invalid_image",
+                "message": error_msg,
+                "hemoglobin_estimate": None,
+                "health_status": None,
+                "processing_time_ms": int((time.time() - start_time) * 1000),
+                "validation": {
+                    k: {"valid": v.valid, "score": v.score, "message": v.message}
+                    for k, v in validation_results.items()
+                },
+            }
+
+        if "eye" in accepted and eye_array is not None:
+            eye_quality = float(validation_results["eye"].score)
+
         prediction = predict_multimodal(
             multimodal_model,
             multimodal_scaler,
             eye=eye_array,
             nail=nail_array,
             palm=palm_array,
+            modalities_filter=accepted,
         )
 
         hemoglobin_estimate = prediction["hemoglobin_estimate"]
@@ -365,17 +370,16 @@ async def predict_batch(files: list[UploadFile] = File(...)):
                 if cv_img is None:
                     raise
                 image_array = cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB)
-            # Skip images that don't contain clear eyes to avoid spurious predictions
-            eye_quality = eye_detector.get_eye_quality_score(image_array)
-            detected = eye_detector.detect_eyes(image_array)
-            print(f"[BATCH] file={file.filename} detected={detected} eye_quality={eye_quality:.3f}")
-            if not detected or eye_quality < EYE_QUALITY_THRESHOLD:
+            validation = validate_eye(image_array, eye_detector)
+            print(f"[BATCH] file={file.filename} valid={validation.valid} score={validation.score:.3f}")
+            if not validation.valid:
                 results.append({
                     "filename": file.filename,
-                    "status": "no_eyes_detected",
+                    "status": "invalid_image",
+                    "message": validation.message,
                     "hemoglobin_estimate": None,
                     "unit": "g/dL",
-                    "eye_quality_score": float(eye_quality)
+                    "eye_quality_score": float(validation.score),
                 })
                 continue
 
@@ -398,7 +402,7 @@ async def predict_batch(files: list[UploadFile] = File(...)):
                 "status": "success",
                 "hemoglobin_estimate": hemoglobin,
                 "unit": "g/dL",
-                "eye_quality_score": float(eye_quality)
+                "eye_quality_score": float(validation.score),
             })
 
         except Exception as e:

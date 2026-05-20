@@ -112,11 +112,16 @@ def predict_multimodal(
     eye: Optional[np.ndarray] = None,
     nail: Optional[np.ndarray] = None,
     palm: Optional[np.ndarray] = None,
+    modalities_filter: Optional[List[str]] = None,
 ) -> Dict:
-    vector, modalities = build_feature_vector(eye=eye, nail=nail, palm=palm)
+    use_eye = eye if modalities_filter is None or "eye" in modalities_filter else None
+    use_nail = nail if modalities_filter is None or "nail" in modalities_filter else None
+    use_palm = palm if modalities_filter is None or "palm" in modalities_filter else None
+
+    vector, modalities = build_feature_vector(eye=use_eye, nail=use_nail, palm=use_palm)
 
     if not modalities:
-        raise ValueError("At least one modality image is required")
+        raise ValueError("At least one validated modality image is required")
 
     scaled = scaler.transform(vector.reshape(1, -1))
     estimate = float(model.predict(scaled)[0])

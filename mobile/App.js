@@ -197,8 +197,11 @@ export default function App() {
         return;
       }
 
-      if (response.data.status === 'no_eyes_detected') {
-        Alert.alert('Eye not detected', response.data.message || 'Try a clearer eye image or add nail/palm.');
+      if (response.data.status === 'invalid_image' || response.data.status === 'no_eyes_detected') {
+        Alert.alert(
+          'Invalid image',
+          response.data.message || 'Please use clear photos of eye, nail, or palm — not random images.'
+        );
         return;
       }
 
