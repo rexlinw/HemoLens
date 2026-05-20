@@ -34,11 +34,8 @@ app.add_middleware(
 MODEL_DIR = Path(__file__).parent / "models"
 RIDGE_MODEL_PATH = MODEL_DIR / "hemolens_ridge_model.pkl"
 SCALER_PATH = MODEL_DIR / "scaler.pkl"
-GB_MODEL_PATH = MODEL_DIR / "hemolens_gb_model.pkl"
-SVR_MODEL_PATH = MODEL_DIR / "hemolens_svr_model.pkl"
 
 ridge_model = None
-gb_model = None
 scaler = None
 eye_detector = None
 multimodal_model = None
@@ -62,7 +59,7 @@ def decode_image_bytes(contents: bytes) -> np.ndarray:
 
 
 def load_models():
-    global ridge_model, gb_model, scaler, eye_detector, models_loaded
+    global ridge_model, scaler, eye_detector, models_loaded
     global multimodal_model, multimodal_scaler, multimodal_config, multimodal_loaded
 
     eye_ok = False
@@ -70,11 +67,6 @@ def load_models():
         with open(RIDGE_MODEL_PATH, 'rb') as f:
             ridge_model = pickle.load(f)
         print(f"✓ Ridge model loaded: {RIDGE_MODEL_PATH}")
-
-        if GB_MODEL_PATH.exists():
-            with open(GB_MODEL_PATH, 'rb') as f:
-                gb_model = pickle.load(f)
-            print("✓ Gradient Boosting model loaded (backup)")
 
         with open(SCALER_PATH, 'rb') as f:
             scaler = pickle.load(f)
@@ -270,7 +262,7 @@ async def predict_multimodal_endpoint(
     if not multimodal_loaded:
         raise HTTPException(
             status_code=503,
-            detail="Multimodal model not loaded. Run train_multimodal_production.py first.",
+            detail="Multimodal model not loaded. Run: python train.py",
         )
 
     if not any([eye_file, nail_file, palm_file]):

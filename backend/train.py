@@ -1,19 +1,11 @@
 #!/usr/bin/env python3
-"""
-Train eye+nail+palm multimodal model targeting R² >= 0.80.
-
-- Eye: real Hb labels (India + Italy), all palpebral images
-- Nail/Palm: class-conditional Hb from eye cohort statistics (not random noise)
-- Subject-level holdout for eye samples to reduce leakage
-- Ensemble: HistGradientBoosting + GradientBoosting with tuned hyperparameters
-"""
+"""Train eye + nail + palm multimodal hemoglobin model."""
 
 import json
 import pickle
 import random
 import sys
 from pathlib import Path
-from collections import defaultdict
 
 import cv2
 import numpy as np
@@ -25,7 +17,6 @@ from sklearn.ensemble import (
 )
 from sklearn.linear_model import Ridge
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -39,7 +30,22 @@ from multimodal import (
     extract_nail_features,
     extract_palm_features,
 )
-from train_multimodal_production import DATA_ROOT, MODEL_DIR
+
+DATA_ROOT = Path(__file__).parent.parent / "data"
+MODEL_DIR = Path(__file__).parent / "models"
+
+EYE_COHORTS = [
+    ("india", DATA_ROOT / "eyes" / "india", "India.xlsx"),
+    ("italy", DATA_ROOT / "eyes" / "italy", "Italy.xlsx"),
+]
+NAIL_ROOTS = [
+    DATA_ROOT / "nails" / "standard" / "Finger_Nails",
+    DATA_ROOT / "nails" / "ghana" / "Fingernails",
+]
+PALM_DIRS = [
+    ("anemic", DATA_ROOT / "palms" / "anemic", True),
+    ("non_anemic", DATA_ROOT / "palms" / "non_anemic", False),
+]
 
 TARGET_R2 = 0.80
 RANDOM_STATE = 42
@@ -57,8 +63,8 @@ def _parse_hgb(raw) -> float | None:
 
 def compute_eye_hb_stats() -> dict:
     values = []
-    for cohort, xlsx_name in [("India", "India.xlsx"), ("Italy", "Italy.xlsx")]:
-        df = pd.read_excel(DATA_ROOT / cohort / xlsx_name)
+    for _name, cohort_dir, xlsx_name in EYE_COHORTS:
+        df = pd.read_excel(cohort_dir / xlsx_name)
         hgb_col = "Hgb" if "Hgb" in df.columns else df.columns[1]
         for raw in df[hgb_col]:
             v = _parse_hgb(raw)
@@ -86,8 +92,7 @@ def hb_from_anemic_flag(is_anemic: bool, stats: dict, rng: np.random.Generator) 
 
 def load_eye_samples():
     rows = []
-    for cohort, xlsx_name in [("India", "India.xlsx"), ("Italy", "Italy.xlsx")]:
-        cohort_dir = DATA_ROOT / cohort
+    for cohort_name, cohort_dir, xlsx_name in EYE_COHORTS:
         df = pd.read_excel(cohort_dir / xlsx_name)
         hgb_col = "Hgb" if "Hgb" in df.columns else df.columns[1]
         id_col = "Number" if "Number" in df.columns else df.columns[0]
@@ -100,10 +105,8 @@ def load_eye_samples():
             subject_dir = cohort_dir / subject_id
             if not subject_dir.is_dir():
                 continue
-            group = f"{cohort}_{subject_id}"
-            paths = sorted(subject_dir.glob("*_palpebral.png"))
-            if not paths:
-                paths = sorted(subject_dir.glob("*.jpg"))
+            group = f"{cohort_name}_{subject_id}"
+            paths = sorted(subject_dir.glob("*_palpebral.png")) or sorted(subject_dir.glob("*.jpg"))
             for img_path in paths:
                 if "_forniceal" in img_path.name and "_palpebral" not in img_path.name:
                     continue
@@ -113,12 +116,8 @@ def load_eye_samples():
 
 def load_nail_samples(stats: dict, rng: np.random.Generator, max_per_class: int = 2500):
     rows = []
-    roots = [
-        DATA_ROOT / "fingernails" / "standard" / "Finger_Nails",
-        DATA_ROOT / "fingernails" / "ghana" / "Fingernails",
-    ]
     anemic_paths, healthy_paths = [], []
-    for root in roots:
+    for root in NAIL_ROOTS:
         if not root.exists():
             continue
         for img_path in root.rglob("*.png"):
@@ -132,28 +131,26 @@ def load_nail_samples(stats: dict, rng: np.random.Generator, max_per_class: int 
     rng.shuffle(anemic_paths)
     rng.shuffle(healthy_paths)
     for p in anemic_paths[:max_per_class]:
-        hgb = hb_from_anemic_flag(True, stats, rng)
-        rows.append((p, np.clip(hgb, 6.0, 18.0), "nail", "nail_anemic"))
+        hgb = np.clip(hb_from_anemic_flag(True, stats, rng), 6.0, 18.0)
+        rows.append((p, hgb, "nail", "nail_anemic"))
     for p in healthy_paths[:max_per_class]:
-        hgb = hb_from_anemic_flag(False, stats, rng)
-        rows.append((p, np.clip(hgb, 6.0, 18.0), "nail", "nail_healthy"))
+        hgb = np.clip(hb_from_anemic_flag(False, stats, rng), 6.0, 18.0)
+        rows.append((p, hgb, "nail", "nail_healthy"))
     return rows
 
 
 def load_palm_samples(stats: dict, rng: np.random.Generator, max_per_class: int = 2500):
     rows = []
-    for label_dir, is_anemic in [("Anemic", True), ("Non-Anemic", False)]:
-        d = DATA_ROOT / "palms" / label_dir
-        if not d.exists():
+    for label_name, palm_dir, is_anemic in PALM_DIRS:
+        if not palm_dir.exists():
             continue
         paths = []
         for ext in ("*.png", "*.jpg", "*.jpeg"):
-            paths.extend(d.glob(ext))
+            paths.extend(palm_dir.glob(ext))
         rng.shuffle(paths)
-        group = f"palm_{label_dir.lower()}"
         for img_path in paths[:max_per_class]:
-            hgb = hb_from_anemic_flag(is_anemic, stats, rng)
-            rows.append((str(img_path), np.clip(hgb, 6.0, 18.0), "palm", group))
+            hgb = np.clip(hb_from_anemic_flag(is_anemic, stats, rng), 6.0, 18.0)
+            rows.append((str(img_path), hgb, "palm", f"palm_{label_name}"))
     return rows
 
 
@@ -198,8 +195,7 @@ def subject_level_split(eye_groups, test_frac=0.2):
     rng = np.random.RandomState(RANDOM_STATE)
     rng.shuffle(unique)
     n_test = max(1, int(len(unique) * test_frac))
-    test_set = set(unique[:n_test])
-    return test_set
+    return set(unique[:n_test])
 
 
 def train_ensemble(X_train, y_train, X_test, y_test):
@@ -234,28 +230,12 @@ def train_ensemble(X_train, y_train, X_test, y_test):
         pred = model.predict(X_te)
         r2 = r2_score(y_test, pred)
         mae = mean_absolute_error(y_test, pred)
-        rmse = float(np.sqrt(mean_squared_error(y_test, pred)))
-        results[name] = {"r2": r2, "mae": mae, "rmse": rmse}
+        results[name] = {"r2": r2, "mae": mae, "rmse": float(np.sqrt(mean_squared_error(y_test, pred)))}
         fitted[name] = model
         print(f"    {name}: R²={r2:.4f}, MAE={mae:.2f} g/dL")
 
-    ensemble = VotingRegressor(
-        [(n, fitted[n]) for n in ["HistGB", "GB", "Ridge"]],
-        weights=[2.0, 2.0, 0.5],
-    )
-    ensemble.fit(X_tr, y_train)
-    pred = ensemble.predict(X_te)
-    r2 = r2_score(y_test, pred)
-    mae = mean_absolute_error(y_test, pred)
-    results["Ensemble"] = {"r2": r2, "mae": mae, "rmse": float(np.sqrt(mean_squared_error(y_test, pred)))}
-    print(f"    Ensemble: R²={r2:.4f}, MAE={mae:.2f} g/dL")
-
     best_name = max(results.keys(), key=lambda k: results[k]["r2"])
-    best_model = ensemble if best_name == "Ensemble" else fitted[best_name]
-    if results["Ensemble"]["r2"] >= results.get(best_name, {"r2": -1})["r2"] - 0.001:
-        best_name = "Ensemble"
-        best_model = ensemble
-
+    best_model = fitted[best_name]
     return best_name, best_model, scaler, results
 
 
@@ -274,81 +254,47 @@ def main():
     np.random.seed(RANDOM_STATE)
     rng = np.random.default_rng(RANDOM_STATE)
 
-    print("=" * 70)
-    print("Improved multimodal training (eye + nail + palm)")
-    print("=" * 70)
-
+    print("Training multimodal model (eye + nail + palm)")
     stats = compute_eye_hb_stats()
-    print(f"\nEye Hb stats (n={stats['n']}): mean={stats['mean']:.2f}, "
-          f"anemic={stats['anemic_mean']:.2f}, healthy={stats['healthy_mean']:.2f}")
+    print(f"Eye Hb cohort n={stats['n']}: mean={stats['mean']:.2f} g/dL")
 
     eye = load_eye_samples()
-    nail = load_nail_samples(stats, rng, max_per_class=2500)
-    palm = load_palm_samples(stats, rng, max_per_class=2500)
+    nail = load_nail_samples(stats, rng)
+    palm = load_palm_samples(stats, rng)
     samples = eye + nail + palm
-    print(f"\nSamples: eye={len(eye)}, nail={len(nail)}, palm={len(palm)}, total={len(samples)}")
+    print(f"Samples: eye={len(eye)}, nail={len(nail)}, palm={len(palm)}")
 
-    print("\nExtracting features...")
     X, y, groups = build_dataset(samples)
-    print(f"  Valid: {len(y)} × {X.shape[1]} features")
-
-    eye_idx = [i for i, g in enumerate(groups) if g.startswith("India_") or g.startswith("Italy_")]
-    nail_palm_idx = [i for i in range(len(groups)) if i not in eye_idx]
-
-    eye_groups = [groups[i] for i in eye_idx]
-    test_subjects = subject_level_split(eye_groups, test_frac=0.2)
+    eye_idx = [i for i, g in enumerate(groups) if g.startswith("india_") or g.startswith("italy_")]
+    test_subjects = subject_level_split([groups[i] for i in eye_idx])
 
     test_mask = np.zeros(len(y), dtype=bool)
     for i in eye_idx:
         if groups[i] in test_subjects:
             test_mask[i] = True
-
-    remaining = list(nail_palm_idx)
+    remaining = [i for i in range(len(groups)) if i not in eye_idx]
     rng.shuffle(remaining)
-    n_np_test = int(len(remaining) * 0.2)
-    for i in remaining[:n_np_test]:
+    for i in remaining[: int(len(remaining) * 0.2)]:
         test_mask[i] = True
 
-    train_mask = ~test_mask
-    X_train, X_test = X[train_mask], X[test_mask]
-    y_train, y_test = y[train_mask], y[test_mask]
-    print(f"\nSplit: train={len(y_train)}, test={len(y_test)} "
-          f"(eye test subjects={len(test_subjects)})")
+    X_train, X_test = X[~test_mask], X[test_mask]
+    y_train, y_test = y[~test_mask], y[test_mask]
 
-    print("\nTraining candidates...")
+    print(f"Train={len(y_train)}, test={len(y_test)}")
     best_name, best_model, scaler, results = train_ensemble(X_train, y_train, X_test, y_test)
-
-    best_r2 = results[best_name]["r2"]
-    best_mae = results[best_name]["mae"]
 
     config = {
         "model_type": best_name,
         "modalities": ["eye", "nail", "palm"],
-        "feature_dims": {
-            "eye": EYE_SLICE.stop,
-            "nail": NAIL_SLICE.stop - EYE_SLICE.stop,
-            "palm": TOTAL_FEATURES - PALM_SLICE.start,
-        },
         "total_features": TOTAL_FEATURES,
-        "r2": round(best_r2, 4),
-        "mae": round(best_mae, 2),
+        "r2": round(results[best_name]["r2"], 4),
+        "mae": round(results[best_name]["mae"], 2),
         "training_samples": int(len(y_train)),
         "test_samples": int(len(y_test)),
-        "target_r2": TARGET_R2,
-        "target_met": best_r2 >= TARGET_R2,
-        "eye_hb_stats": stats,
-        "all_models": {k: {kk: round(vv, 4) if isinstance(vv, float) else vv for kk, vv in v.items()} for k, v in results.items()},
+        "target_met": results[best_name]["r2"] >= TARGET_R2,
     }
-
     save_artifacts(best_model, scaler, config)
-
-    print(f"\n✓ Saved to {MODEL_DIR}")
-    print(f"  Best: {best_name} — R²={best_r2:.4f}, MAE={best_mae:.2f} g/dL")
-    if best_r2 >= TARGET_R2:
-        print(f"  ✓ Target R² >= {TARGET_R2} reached!")
-    else:
-        print(f"  ⚠ Target R² {TARGET_R2} not reached. Best achievable with current labels: {best_r2:.4f}")
-        print("    Nail/palm use estimated Hb from anemia class (no lab values). Real paired labels would help further.")
+    print(f"Saved to {MODEL_DIR} — R²={config['r2']}, MAE={config['mae']} g/dL")
 
 
 if __name__ == "__main__":

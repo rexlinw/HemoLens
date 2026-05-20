@@ -1,23 +1,38 @@
 # HemoLens
 
-Non-invasive hemoglobin estimation from eye images using machine learning. FastAPI backend with React Native (Expo) mobile app.
+Non-invasive hemoglobin estimation from **eye**, **nail**, and **palm** images. FastAPI backend + Expo mobile app.
 
-## Structure
+Repository: [github.com/rexlinw/HemoLens](https://github.com/rexlinw/HemoLens)
+
+## Project structure
 
 ```
-├── backend/                 # FastAPI API
-│   ├── app.py              # Main application
-│   ├── eye_detector.py     # Eye detection & health classification
+├── backend/                 # FastAPI + ML
+│   ├── app.py               # API server
+│   ├── multimodal.py        # Feature fusion & prediction
+│   ├── image_validator.py   # Reject invalid/random images
 │   ├── feature_extraction.py
+│   ├── nail_feature_extraction.py
+│   ├── palm_feature_extraction.py
+│   ├── eye_detector.py
 │   ├── preprocessing.py
+│   ├── train.py             # Train multimodal model
 │   ├── requirements.txt
-│   └── models/             # Trained models (.pkl)
-├── mobile/                  # React Native + Expo app
+│   └── models/              # Production .pkl artifacts
+├── mobile/                  # Expo React Native app
 │   ├── App.js
 │   ├── RealtimeCamera.js
-│   ├── config.js
-│   ├── package.json
-│   └── app.json
+│   └── config.js
+├── data/                    # Local datasets (not in git)
+│   ├── eyes/
+│   │   ├── india/           # Subject folders + India.xlsx
+│   │   └── italy/           # Subject folders + Italy.xlsx
+│   ├── nails/
+│   │   ├── ghana/Fingernails/
+│   │   └── standard/Finger_Nails/
+│   └── palms/
+│       ├── anemic/
+│       └── non_anemic/
 ├── Dockerfile
 ├── render.yaml
 └── README.md
@@ -25,87 +40,64 @@ Non-invasive hemoglobin estimation from eye images using machine learning. FastA
 
 ## Backend
 
-### Setup
-
 ```bash
 cd backend
 pip install -r requirements.txt
-```
-
-### Run
-
-```bash
 python app.py
 ```
 
-Server: `http://localhost:8000`
+API: `http://localhost:8000`
 
-### API
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/health` | Health check |
-| GET | `/info` | Model info |
-| POST | `/predict` | Single eye image |
-| POST | `/predict/multimodal` | Eye, nail, and/or palm images (`eye_file`, `nail_file`, `palm_file`) |
-| POST | `/predict/batch` | Batch eye predictions |
-
-### Train multimodal model
-
-```bash
-cd backend
-python train_multimodal_production.py
-```
+| Endpoint | Description |
+|----------|-------------|
+| `GET /health` | Health + model metrics |
+| `POST /predict` | Single eye image |
+| `POST /predict/multimodal` | `eye_file`, `nail_file`, `palm_file` (≥1 required) |
 
 ## Mobile
-
-### Setup
 
 ```bash
 cd mobile
 npm install
-```
-
-### Run
-
-```bash
 npx expo start
 ```
 
-### Local backend
+Local backend:
 
 ```bash
-EXPO_PUBLIC_API_URL=http://YOUR_IP:8000 npx expo start
+EXPO_PUBLIC_API_URL=http://YOUR_LAN_IP:8000 npx expo start
 ```
 
-## Deployment
+## Train model
 
-### Render
-
-1. Connect repo to [Render](https://render.com)
-2. Create Web Service from `render.yaml`
-3. Set Root Directory to repository root
-4. Deploy
-
-### Docker
+Place datasets under `data/` as shown above, then:
 
 ```bash
-docker build -t hemolens .
-docker run -p 8080:8080 hemolens
+cd backend
+python train.py
 ```
 
-## Model
+Writes `models/hemolens_multimodal.pkl`, `multimodal_scaler.pkl`, `multimodal_config.json`.
 
-- **Algorithm**: Ridge Regression (46 features)
-- **Performance (multimodal eye+nail+palm)**: R² ≈ 0.85, MAE ≈ 0.58 g/dL (see `backend/models/multimodal_config.json`)
-- **Eye-only fallback**: R² ≈ 0.63, MAE ≈ 0.96 g/dL
-- **Features**: RGB, LAB, HSV, YCrCb, statistical, edge, contrast, histogram
+## Model performance
 
-## WHO Guidelines
+See `backend/models/multimodal_config.json` for current metrics (multimodal eye+nail+palm: **R² ≈ 0.85**, **MAE ≈ 0.58 g/dL** on held-out test split).
 
-| Status | Range (g/dL) |
-|--------|--------------|
-| Low | < 12.0 |
-| Borderline | 12.0–13.5 |
-| Safe | 13.5–17.5 |
-| High | > 17.5 |
+## Deploy (Render)
+
+1. Connect [rexlinw/HemoLens](https://github.com/rexlinw/HemoLens) to Render
+2. Root directory: repository root
+3. Use `render.yaml` blueprint or:
+   - Build: `pip install -r backend/requirements.txt`
+   - Start: `cd backend && uvicorn app:app --host 0.0.0.0 --port $PORT`
+
+## WHO reference (g/dL)
+
+| Status | Range |
+|--------|--------|
+| Low | &lt; 12.0 |
+| Borderline | 12.0 – 13.5 |
+| Normal | 13.5 – 17.5 |
+| High | &gt; 17.5 |
+
+Estimate only — not a medical diagnosis.
