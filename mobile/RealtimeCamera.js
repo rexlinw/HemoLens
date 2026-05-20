@@ -102,8 +102,8 @@ export default function RealtimeCamera({ onClose }) {
         timeout: 30000,
       });
 
-      if (response.data.status === 'no_eyes_detected') {
-        console.log('No eyes detected:', response.data.message);
+      if (response.data.status === 'no_eyes_detected' || response.data.status === 'invalid_image') {
+        console.log('Image rejected:', response.data.message);
         return;
       }
 
