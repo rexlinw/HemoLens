@@ -554,7 +554,7 @@ function buildRetakeNotice(validation, fallbackMessage) {
               </View>
             )}
           </View>
-          {result.modalitiesUsed?.length > 0 && (
+          {result.modalitiesUsed?.length > 1 && (
             <Text style={styles.modalitiesUsed}>
               Used: {result.modalitiesUsed.join(' · ')}
             </Text>
