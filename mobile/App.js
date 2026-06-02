@@ -353,10 +353,6 @@ function buildRetakeNotice(validation, fallbackMessage) {
           response = await tryMultimodalPost();
         } catch (multimodalError) {
           if (isLegacyApiError(multimodalError) && images.eye) {
-            Alert.alert(
-              'Eye-only mode',
-              'The server is missing the multimodal route. Using the eye image only until Render is redeployed from main.'
-            );
             response = await predictEyeOnly();
           } else {
             throw multimodalError;
