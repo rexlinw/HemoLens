@@ -17,7 +17,7 @@ from image_validator import validate_eye, validate_multimodal_inputs
 
 app = FastAPI(
     title="HemoLens API v3.0",
-    description="Multimodal non-invasive hemoglobin estimation (eye, nail, palm)",
+    description="Multimodal non-invasive hemoglobin estimation (eye, finger/nail, palm)",
     version="3.0.1"
 )
 
@@ -131,14 +131,14 @@ async def startup_event():
 async def root():
     return {
         "name": "HemoLens API v3.0.1",
-        "description": "Multimodal non-invasive hemoglobin estimation",
+        "description": "Multimodal non-invasive hemoglobin estimation for eye, finger/nail, and palm inputs",
         "model_version": multimodal_config.get("model_type") if multimodal_config else None,
         "endpoints": {
             "GET /health": "Check API health and model status",
             "GET /info": "Get model information",
-            "POST /validate/multimodal": "Validate eye, nail, and/or palm images",
+            "POST /validate/multimodal": "Validate eye, finger/nail, and/or palm images",
             "POST /predict": "Predict from single eye image",
-            "POST /predict/multimodal": "Predict from eye, nail, and/or palm images",
+            "POST /predict/multimodal": "Predict from eye, finger/nail, and/or palm images",
             "POST /predict/batch": "Batch eye predictions",
         },
         "multimodal_available": multimodal_loaded,

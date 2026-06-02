@@ -137,6 +137,23 @@ def validate_eye(image: np.ndarray, eye_detector: EyeDetector) -> ValidationResu
             "Image does not look like a close-up eye photo. Fill more of the frame with the eye area.",
         )
 
+    face_roi = rgb[face_y:face_y + face_h, face_x:face_x + face_w]
+    face_skin_fraction = _skin_fraction(face_roi)
+    if face_skin_fraction < 0.03:
+        return ValidationResult(
+            False,
+            quality,
+            "Image does not look like a human eye photo. Include visible facial skin around the eye.",
+        )
+
+    face_aspect = float(face_w) / float(face_h + 1e-6)
+    if face_aspect < 0.65 or face_aspect > 1.55:
+        return ValidationResult(
+            False,
+            quality,
+            "Detected face region looks implausible for an eye photo.",
+        )
+
     roi_gray = enhanced[face_y:face_y + face_h, face_x:face_x + face_w]
     eye_boxes = eye_detector.eye_cascade.detectMultiScale(
         roi_gray,

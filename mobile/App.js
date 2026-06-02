@@ -21,7 +21,7 @@ const MAX_HISTORY = 12;
 
 const MODALITIES = [
   { key: 'eye', label: 'Eye', hint: 'Palpebral conjunctiva, well lit' },
-  { key: 'nail', label: 'Nail', hint: 'Fingernail bed, clear focus' },
+  { key: 'nail', label: 'Finger/Nail', hint: 'Fingernail bed, clear focus' },
   { key: 'palm', label: 'Palm', hint: 'Open palm, fingers spread' },
 ];
 
@@ -293,7 +293,7 @@ function buildRetakeNotice(validation, fallbackMessage) {
 
   const predictMultimodal = async () => {
     if (!hasAnyImage) {
-      Alert.alert('Add images', 'Add at least one of: eye, nail, or palm.');
+      Alert.alert('Add images', 'Add at least one of: eye, finger/nail, or palm.');
       return;
     }
 
@@ -435,10 +435,10 @@ function buildRetakeNotice(validation, fallbackMessage) {
             </Text>
           </View>
         </View>
-        <Text style={styles.subtitle}>Multimodal anemia screening — eye, nail & palm</Text>
+        <Text style={styles.subtitle}>Multimodal anemia screening — eye, finger/nail & palm</Text>
         <View style={styles.modelBanner}>
           <View style={styles.modelBannerTop}>
-            <Text style={styles.modelBannerTitle}>Trained on all three modalities</Text>
+            <Text style={styles.modelBannerTitle}>Trained on eye, finger/nail, and palm</Text>
             <Text style={styles.modelBannerMeta}>
               {selectedModalities.length}/3 selected
             </Text>
@@ -454,7 +454,7 @@ function buildRetakeNotice(validation, fallbackMessage) {
             })}
           </View>
           <Text style={styles.modelBannerCopy}>
-            Best accuracy comes from eye + nail + palm together. You can still analyze with any subset.
+            Best accuracy comes from eye + finger/nail + palm together. You can still analyze with any subset.
           </Text>
         </View>
       </View>
@@ -516,7 +516,7 @@ function buildRetakeNotice(validation, fallbackMessage) {
             <ActivityIndicator color="#FFF" size="small" />
           ) : (
             <Text style={styles.primaryBtnText}>
-              {allModalitiesSelected ? 'Analyze eye + nail + palm' : 'Analyze selected images'}
+              {allModalitiesSelected ? 'Analyze eye + finger/nail + palm' : 'Analyze selected images'}
             </Text>
           )}
         </TouchableOpacity>
