@@ -137,8 +137,6 @@ export default function App() {
   const [useRealtimeMode, setUseRealtimeMode] = useState(false);
   const selectedModalities = MODALITIES.filter((m) => images[m.key]).map((m) => m.label);
   const allModalitiesSelected = selectedModalities.length === MODALITIES.length;
-  const [qualityChecks, setQualityChecks] = useState({});
-  const [qualityLoading, setQualityLoading] = useState(false);
   const [retakeNotice, setRetakeNotice] = useState(null);
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(true);
@@ -146,92 +144,6 @@ export default function App() {
   React.useEffect(() => {
     checkApiHealth();
   }, []);
-
-  React.useEffect(() => {
-    let active = true;
-
-    const loadHistory = async () => {
-      try {
-        const info = await FileSystem.getInfoAsync(HISTORY_FILE);
-        if (!info.exists) {
-          if (active) {
-            setHistory([]);
-            setHistoryLoading(false);
-          }
-          return;
-        }
-
-        const raw = await FileSystem.readAsStringAsync(HISTORY_FILE);
-        const parsed = JSON.parse(raw);
-        if (active) {
-          setHistory(Array.isArray(parsed) ? parsed : []);
-        }
-      } catch (_) {
-        if (active) {
-          setHistory([]);
-        }
-      } finally {
-        if (active) {
-          setHistoryLoading(false);
-        }
-      }
-    };
-
-    loadHistory();
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  React.useEffect(() => {
-    let active = true;
-
-    const runValidation = async () => {
-      const selected = MODALITIES.filter((mod) => images[mod.key]);
-      if (selected.length === 0) {
-        setQualityChecks({});
-        setQualityLoading(false);
-        return;
-      }
-
-      setQualityLoading(true);
-
-      const formData = new FormData();
-      if (images.eye) appendImageToFormData(formData, 'eye_file', images.eye);
-      if (images.nail) appendImageToFormData(formData, 'nail_file', images.nail);
-      if (images.palm) appendImageToFormData(formData, 'palm_file', images.palm);
-
-      const urls = [`${API_BASE_URL}/validate/multimodal`, `${API_BASE_URL}/validate-images`];
-      let responseData = null;
-
-      for (const url of urls) {
-        try {
-          const response = await axios.post(url, formData, {
-            headers: { 'Content-Type': 'multipart/form-data' },
-            timeout: 30000,
-          });
-          responseData = response.data;
-          break;
-        } catch (_) {
-          responseData = null;
-        }
-      }
-
-      if (!active) {
-        return;
-      }
-
-      setQualityChecks(responseData?.validation || {});
-      setQualityLoading(false);
-    };
-
-    runValidation();
-
-    return () => {
-      active = false;
-    };
-  }, [images.eye, images.nail, images.palm]);
 
   const checkApiHealth = async () => {
     try {
@@ -316,42 +228,6 @@ export default function App() {
     });
   };
 
-function getQualityMeta(result, loading) {
-  if (loading) {
-    return { label: 'Checking quality…', color: '#D97706', backgroundColor: '#FEF3C7' };
-  }
-
-  if (!result) {
-    return { label: 'Not checked', color: '#64748B', backgroundColor: '#E2E8F0' };
-  }
-
-  if (result.valid) {
-    return { label: 'Ready', color: '#059669', backgroundColor: '#D1FAE5' };
-  }
-
-  const message = (result.message || '').toLowerCase();
-  if (message.includes('dark')) {
-    return { label: 'Too dark', color: '#B45309', backgroundColor: '#FEF3C7' };
-  }
-  if (message.includes('blurry') || message.includes('focus')) {
-    return { label: 'Blurry', color: '#B45309', backgroundColor: '#FEF3C7' };
-  }
-  if (message.includes('overexposed')) {
-    return { label: 'Too bright', color: '#B45309', backgroundColor: '#FEF3C7' };
-  }
-  if (message.includes('eye')) {
-    return { label: 'Eye needs retake', color: '#DC2626', backgroundColor: '#FEE2E2' };
-  }
-  if (message.includes('nail')) {
-    return { label: 'Nail needs retake', color: '#DC2626', backgroundColor: '#FEE2E2' };
-  }
-  if (message.includes('palm')) {
-    return { label: 'Palm needs retake', color: '#DC2626', backgroundColor: '#FEE2E2' };
-  }
-
-  return { label: 'Needs retake', color: '#DC2626', backgroundColor: '#FEE2E2' };
-}
-
 function getRetakeAdvice(modality, message) {
   const lower = (message || '').toLowerCase();
   const title = modality.charAt(0).toUpperCase() + modality.slice(1);
@@ -398,8 +274,6 @@ function buildRetakeNotice(validation, fallbackMessage) {
     items: failed,
   };
 }
-
-  const overallReadyCount = MODALITIES.filter((mod) => qualityChecks[mod.key]?.valid).length;
 
   const hasAnyImage = MODALITIES.some((m) => images[m.key]);
 
@@ -481,7 +355,7 @@ function buildRetakeNotice(validation, fallbackMessage) {
           if (isLegacyApiError(multimodalError) && images.eye) {
             Alert.alert(
               'Eye-only mode',
-              'Server is missing the multimodal route. Using the eye image only until Render is redeployed from main.'
+              'The server is missing the multimodal route. Using the eye image only until Render is redeployed from main.'
             );
             response = await predictEyeOnly();
           } else {
@@ -587,17 +461,6 @@ function buildRetakeNotice(validation, fallbackMessage) {
             Best accuracy comes from eye + nail + palm together. You can still analyze with any subset.
           </Text>
         </View>
-        <View style={styles.qualityBanner}>
-          <View style={styles.qualityBannerTop}>
-            <Text style={styles.qualityBannerTitle}>Live quality meter</Text>
-            <Text style={styles.qualityBannerCount}>
-              {qualityLoading ? 'Checking…' : `${overallReadyCount}/${selectedModalities.length || 3} ready`}
-            </Text>
-          </View>
-          <Text style={styles.qualityBannerCopy}>
-            Blur, exposure, and whether the body part is centered are checked before Analyze.
-          </Text>
-        </View>
       </View>
 
       <View style={styles.section}>
@@ -613,26 +476,12 @@ function buildRetakeNotice(validation, fallbackMessage) {
                   </TouchableOpacity>
                 )}
               </View>
-              {asset && (
-                <View style={styles.qualityRow}>
-                  {(() => {
-                    const meta = getQualityMeta(qualityChecks[mod.key], qualityLoading);
-                    return (
-                      <View style={[styles.qualityChip, { backgroundColor: meta.backgroundColor, borderColor: meta.color }]}>
-                        <View style={[styles.qualityDot, { backgroundColor: meta.color }]} />
-                        <Text style={[styles.qualityChipText, { color: meta.color }]}>{meta.label}</Text>
-                      </View>
-                    );
-                  })()}
-                </View>
-              )}
               {asset ? (
                 <Image source={{ uri: asset.uri }} style={styles.modalityImage} contentFit="cover" />
               ) : (
                 <View style={styles.modalityPlaceholder}>
                   <CaptureGuide modality={mod.key} />
                   <Text style={styles.modalityHint}>{mod.hint}</Text>
-                  <Text style={styles.modalityHintSecondary}>Quality meter will update after capture</Text>
                 </View>
               )}
               <View style={styles.modalityActions}>
@@ -842,18 +691,6 @@ const styles = StyleSheet.create({
   modelChipText: { fontSize: 12, fontWeight: '700', color: colors.textSecondary },
   modelChipTextActive: { color: '#FFFFFF' },
   modelBannerCopy: { marginTop: 10, fontSize: 12, color: colors.textSecondary, lineHeight: 18 },
-  qualityBanner: {
-    marginTop: 12,
-    backgroundColor: '#FFF7ED',
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#FDBA74',
-  },
-  qualityBannerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
-  qualityBannerTitle: { fontSize: 14, fontWeight: '800', color: colors.text },
-  qualityBannerCount: { fontSize: 12, fontWeight: '700', color: '#C2410C' },
-  qualityBannerCopy: { marginTop: 8, fontSize: 12, color: colors.textSecondary, lineHeight: 18 },
   section: { paddingHorizontal: 24, paddingTop: 20 },
   modalityCard: {
     backgroundColor: colors.surface,
@@ -866,18 +703,6 @@ const styles = StyleSheet.create({
   modalityHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   modalityLabel: { fontSize: 16, fontWeight: '700', color: colors.text },
   clearText: { fontSize: 13, color: colors.primary, fontWeight: '600' },
-  qualityRow: { marginBottom: 8, flexDirection: 'row', alignItems: 'center' },
-  qualityChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  qualityDot: { width: 8, height: 8, borderRadius: 4 },
-  qualityChipText: { fontSize: 12, fontWeight: '700' },
   modalityImage: { width: '100%', height: 140, borderRadius: 10, backgroundColor: colors.border },
   modalityPlaceholder: {
     height: 100,
@@ -888,7 +713,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   modalityHint: { fontSize: 12, color: colors.textSecondary, textAlign: 'center' },
-    modalityHintSecondary: { fontSize: 11, color: colors.textMuted, textAlign: 'center', marginTop: 4 },
   captureGuide: {
     alignItems: 'center',
     justifyContent: 'center',
