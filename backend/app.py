@@ -18,7 +18,7 @@ from image_validator import validate_eye, validate_multimodal_inputs
 app = FastAPI(
     title="HemoLens API v3.0",
     description="Multimodal non-invasive hemoglobin estimation (eye, nail, palm)",
-    version="3.0.0"
+    version="3.0.1"
 )
 
 app.add_middleware(
@@ -130,7 +130,7 @@ async def startup_event():
 @app.get("/")
 async def root():
     return {
-        "name": "HemoLens API v3.0",
+        "name": "HemoLens API v3.0.1",
         "description": "Multimodal non-invasive hemoglobin estimation",
         "model_version": multimodal_config.get("model_type") if multimodal_config else None,
         "endpoints": {
