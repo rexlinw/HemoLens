@@ -136,6 +136,7 @@ async def root():
         "endpoints": {
             "GET /health": "Check API health and model status",
             "GET /info": "Get model information",
+            "POST /validate/multimodal": "Validate eye, nail, and/or palm images",
             "POST /predict": "Predict from single eye image",
             "POST /predict/multimodal": "Predict from eye, nail, and/or palm images",
             "POST /predict/batch": "Batch eye predictions",
@@ -198,6 +199,49 @@ async def get_model_info():
             "hemoglobin_std": None
         }
     }
+
+
+@app.post("/validate/multimodal")
+@app.post("/validate-images")
+async def validate_multimodal_endpoint(
+    eye_file: Optional[UploadFile] = File(None),
+    nail_file: Optional[UploadFile] = File(None),
+    palm_file: Optional[UploadFile] = File(None),
+):
+    if not any([eye_file, nail_file, palm_file]):
+        raise HTTPException(
+            status_code=400,
+            detail="Provide at least one image: eye_file, nail_file, or palm_file",
+        )
+
+    eye_array = nail_array = palm_array = None
+    try:
+        if eye_file and eye_file.filename:
+            eye_array = decode_image_bytes(await eye_file.read())
+        if nail_file and nail_file.filename:
+            nail_array = decode_image_bytes(await nail_file.read())
+        if palm_file and palm_file.filename:
+            palm_array = decode_image_bytes(await palm_file.read())
+
+        validation_results, accepted, error_msg = validate_multimodal_inputs(
+            eye_detector, eye=eye_array, nail=nail_array, palm=palm_array
+        )
+
+        return {
+            "status": "valid" if accepted else "invalid_image",
+            "accepted": accepted,
+            "message": error_msg,
+            "validation": {
+                key: {
+                    "valid": result.valid,
+                    "score": float(result.score),
+                    "message": result.message,
+                }
+                for key, result in validation_results.items()
+            },
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Validation error: {str(e)}")
 
 
 @app.post("/predict")

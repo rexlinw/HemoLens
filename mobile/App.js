@@ -9,10 +9,15 @@ import {
   Alert,
 } from 'react-native';
 import { Image } from 'expo-image';
+import * as FileSystem from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import axios from 'axios';
+import { Share } from 'react-native';
 import RealtimeCamera from './RealtimeCamera';
 import { API_BASE_URL } from './config';
+
+const HISTORY_FILE = `${FileSystem.documentDirectory}hemolens_history.json`;
+const MAX_HISTORY = 12;
 
 const MODALITIES = [
   { key: 'eye', label: 'Eye', hint: 'Palpebral conjunctiva, well lit' },
@@ -57,6 +62,73 @@ function appendImageToFormData(formData, fieldName, asset) {
   });
 }
 
+function formatHistoryDate(isoString) {
+  try {
+    return new Date(isoString).toLocaleString();
+  } catch (_) {
+    return isoString;
+  }
+}
+
+function buildHistorySummary(entries) {
+  if (entries.length < 2) {
+    return null;
+  }
+
+  const latest = entries[0].hemoglobin;
+  const oldest = entries[Math.min(entries.length - 1, 4)].hemoglobin;
+  const delta = latest - oldest;
+  const label = delta > 0.2 ? 'Up' : delta < -0.2 ? 'Down' : 'Stable';
+
+  return {
+    label,
+    delta,
+  };
+}
+
+function CaptureGuide({ modality }) {
+  if (modality === 'eye') {
+    return (
+      <View style={styles.captureGuide}>
+        <View style={styles.eyeGuideFrame}>
+          <View style={styles.eyeGuideShape}>
+            <View style={styles.eyeGuidePupil} />
+          </View>
+        </View>
+        <Text style={styles.captureGuideLabel}>Center the lower eyelid</Text>
+      </View>
+    );
+  }
+
+  if (modality === 'nail') {
+    return (
+      <View style={styles.captureGuide}>
+        <View style={styles.nailGuideFrame}>
+          <View style={styles.nailGuidePlate} />
+          <View style={styles.nailGuideCuticle} />
+        </View>
+        <Text style={styles.captureGuideLabel}>Fill the frame with one clean nail bed</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.captureGuide}>
+      <View style={styles.palmGuideFrame}>
+        <View style={styles.palmGuideThumb} />
+        <View style={styles.palmGuideFingerRow}>
+          <View style={styles.palmGuideFinger} />
+          <View style={styles.palmGuideFinger} />
+          <View style={styles.palmGuideFinger} />
+          <View style={styles.palmGuideFinger} />
+        </View>
+        <View style={styles.palmGuideBase} />
+      </View>
+      <Text style={styles.captureGuideLabel}>Show an open palm with fingers spread</Text>
+    </View>
+  );
+}
+
 export default function App() {
   const [images, setImages] = useState({ eye: null, nail: null, palm: null });
   const [loading, setLoading] = useState(false);
@@ -65,10 +137,101 @@ export default function App() {
   const [useRealtimeMode, setUseRealtimeMode] = useState(false);
   const selectedModalities = MODALITIES.filter((m) => images[m.key]).map((m) => m.label);
   const allModalitiesSelected = selectedModalities.length === MODALITIES.length;
+  const [qualityChecks, setQualityChecks] = useState({});
+  const [qualityLoading, setQualityLoading] = useState(false);
+  const [retakeNotice, setRetakeNotice] = useState(null);
+  const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
 
   React.useEffect(() => {
     checkApiHealth();
   }, []);
+
+  React.useEffect(() => {
+    let active = true;
+
+    const loadHistory = async () => {
+      try {
+        const info = await FileSystem.getInfoAsync(HISTORY_FILE);
+        if (!info.exists) {
+          if (active) {
+            setHistory([]);
+            setHistoryLoading(false);
+          }
+          return;
+        }
+
+        const raw = await FileSystem.readAsStringAsync(HISTORY_FILE);
+        const parsed = JSON.parse(raw);
+        if (active) {
+          setHistory(Array.isArray(parsed) ? parsed : []);
+        }
+      } catch (_) {
+        if (active) {
+          setHistory([]);
+        }
+      } finally {
+        if (active) {
+          setHistoryLoading(false);
+        }
+      }
+    };
+
+    loadHistory();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  React.useEffect(() => {
+    let active = true;
+
+    const runValidation = async () => {
+      const selected = MODALITIES.filter((mod) => images[mod.key]);
+      if (selected.length === 0) {
+        setQualityChecks({});
+        setQualityLoading(false);
+        return;
+      }
+
+      setQualityLoading(true);
+
+      const formData = new FormData();
+      if (images.eye) appendImageToFormData(formData, 'eye_file', images.eye);
+      if (images.nail) appendImageToFormData(formData, 'nail_file', images.nail);
+      if (images.palm) appendImageToFormData(formData, 'palm_file', images.palm);
+
+      const urls = [`${API_BASE_URL}/validate/multimodal`, `${API_BASE_URL}/validate-images`];
+      let responseData = null;
+
+      for (const url of urls) {
+        try {
+          const response = await axios.post(url, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+            timeout: 30000,
+          });
+          responseData = response.data;
+          break;
+        } catch (_) {
+          responseData = null;
+        }
+      }
+
+      if (!active) {
+        return;
+      }
+
+      setQualityChecks(responseData?.validation || {});
+      setQualityLoading(false);
+    };
+
+    runValidation();
+
+    return () => {
+      active = false;
+    };
+  }, [images.eye, images.nail, images.palm]);
 
   const checkApiHealth = async () => {
     try {
@@ -101,7 +264,142 @@ export default function App() {
   const clearModality = (modality) => {
     setImages((prev) => ({ ...prev, [modality]: null }));
     setResult(null);
+    setRetakeNotice(null);
   };
+
+  const saveHistory = async (entries) => {
+    const trimmed = entries.slice(0, MAX_HISTORY);
+    setHistory(trimmed);
+    try {
+      await FileSystem.writeAsStringAsync(HISTORY_FILE, JSON.stringify(trimmed, null, 2));
+    } catch (error) {
+      console.log('History save error:', error.message);
+    }
+  };
+
+  const addHistoryEntry = async (entry) => {
+    const next = [entry, ...history].slice(0, MAX_HISTORY);
+    await saveHistory(next);
+  };
+
+  const exportHistory = async () => {
+    if (history.length === 0) {
+      Alert.alert('No history', 'There are no saved readings to export yet.');
+      return;
+    }
+
+    const header = [
+      'Date',
+      'Hemoglobin (g/dL)',
+      'Status',
+      'Modalities',
+      'Processing Time (ms)',
+    ];
+    const rows = history.map((entry) => [
+      entry.date,
+      entry.hemoglobin.toFixed(1),
+      entry.healthStatus || '',
+      (entry.modalitiesUsed || []).join(' / '),
+      entry.processingTime ?? '',
+    ]);
+    const csv = [header, ...rows]
+      .map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+
+    const fileUri = `${FileSystem.documentDirectory}hemolens_history_export.csv`;
+    await FileSystem.writeAsStringAsync(fileUri, csv);
+
+    await Share.share({
+      url: fileUri,
+      title: 'HemoLens history export',
+      message: 'HemoLens screening history export for clinician review. Screening estimate only, not a diagnosis.',
+    });
+  };
+
+function getQualityMeta(result, loading) {
+  if (loading) {
+    return { label: 'Checking quality…', color: '#D97706', backgroundColor: '#FEF3C7' };
+  }
+
+  if (!result) {
+    return { label: 'Not checked', color: '#64748B', backgroundColor: '#E2E8F0' };
+  }
+
+  if (result.valid) {
+    return { label: 'Ready', color: '#059669', backgroundColor: '#D1FAE5' };
+  }
+
+  const message = (result.message || '').toLowerCase();
+  if (message.includes('dark')) {
+    return { label: 'Too dark', color: '#B45309', backgroundColor: '#FEF3C7' };
+  }
+  if (message.includes('blurry') || message.includes('focus')) {
+    return { label: 'Blurry', color: '#B45309', backgroundColor: '#FEF3C7' };
+  }
+  if (message.includes('overexposed')) {
+    return { label: 'Too bright', color: '#B45309', backgroundColor: '#FEF3C7' };
+  }
+  if (message.includes('eye')) {
+    return { label: 'Eye needs retake', color: '#DC2626', backgroundColor: '#FEE2E2' };
+  }
+  if (message.includes('nail')) {
+    return { label: 'Nail needs retake', color: '#DC2626', backgroundColor: '#FEE2E2' };
+  }
+  if (message.includes('palm')) {
+    return { label: 'Palm needs retake', color: '#DC2626', backgroundColor: '#FEE2E2' };
+  }
+
+  return { label: 'Needs retake', color: '#DC2626', backgroundColor: '#FEE2E2' };
+}
+
+function getRetakeAdvice(modality, message) {
+  const lower = (message || '').toLowerCase();
+  const title = modality.charAt(0).toUpperCase() + modality.slice(1);
+
+  if (lower.includes('dark')) {
+    return `${title}: too dark. Move closer to a brighter light source and avoid shadows.`;
+  }
+  if (lower.includes('overexposed')) {
+    return `${title}: too bright. Step away from direct flash or harsh light.`;
+  }
+  if (lower.includes('blurry') || lower.includes('focus')) {
+    return `${title}: blurry. Hold the camera steady and make sure the target is sharply focused.`;
+  }
+  if (lower.includes('eye')) {
+    return 'Eye: retake with the lower eyelid or conjunctiva centered in the frame.';
+  }
+  if (lower.includes('nail')) {
+    return 'Nail: retake with one clean nail bed filling most of the frame.';
+  }
+  if (lower.includes('palm')) {
+    return 'Palm: retake with an open palm, fingers spread, and the full hand visible.';
+  }
+  return `${title}: retake this image with a clearer, better centered photo.`;
+}
+
+function buildRetakeNotice(validation, fallbackMessage) {
+  if (!validation) {
+    return null;
+  }
+
+  const failed = Object.entries(validation)
+    .filter(([, result]) => result && result.valid === false)
+    .map(([modality, result]) => getRetakeAdvice(modality, result.message));
+
+  if (failed.length === 0) {
+    return {
+      title: 'Retake needed',
+      items: [fallbackMessage || 'One or more images need a clearer retake.'],
+    };
+  }
+
+  return {
+    title: failed.length === 1 ? 'Retake this image' : 'Retake these images',
+    items: failed,
+  };
+}
+
+  const overallReadyCount = MODALITIES.filter((mod) => qualityChecks[mod.key]?.valid).length;
 
   const hasAnyImage = MODALITIES.some((m) => images[m.key]);
 
@@ -127,6 +425,7 @@ export default function App() {
 
     setLoading(true);
     setResult(null);
+    setRetakeNotice(null);
 
     try {
       let healthData = {};
@@ -200,10 +499,8 @@ export default function App() {
       }
 
       if (response.data.status === 'invalid_image' || response.data.status === 'no_eyes_detected') {
-        Alert.alert(
-          'Invalid image',
-          response.data.message || 'Please use clear photos of eye, nail, or palm — not random images.'
-        );
+        const notice = buildRetakeNotice(response.data.validation, response.data.message);
+        setRetakeNotice(notice);
         return;
       }
 
@@ -213,6 +510,13 @@ export default function App() {
         healthStatus: response.data.health_status,
         healthMessage: response.data.health_message,
         healthColor: response.data.health_color,
+        modalitiesUsed: response.data.modalities_used || (images.eye ? ['eye'] : []),
+        processingTime: response.data.processing_time_ms,
+      });
+      addHistoryEntry({
+        date: new Date().toISOString(),
+        hemoglobin: Number(response.data.hemoglobin_estimate),
+        healthStatus: response.data.health_status,
         modalitiesUsed: response.data.modalities_used || (images.eye ? ['eye'] : []),
         processingTime: response.data.processing_time_ms,
       });
@@ -283,6 +587,17 @@ export default function App() {
             Best accuracy comes from eye + nail + palm together. You can still analyze with any subset.
           </Text>
         </View>
+        <View style={styles.qualityBanner}>
+          <View style={styles.qualityBannerTop}>
+            <Text style={styles.qualityBannerTitle}>Live quality meter</Text>
+            <Text style={styles.qualityBannerCount}>
+              {qualityLoading ? 'Checking…' : `${overallReadyCount}/${selectedModalities.length || 3} ready`}
+            </Text>
+          </View>
+          <Text style={styles.qualityBannerCopy}>
+            Blur, exposure, and whether the body part is centered are checked before Analyze.
+          </Text>
+        </View>
       </View>
 
       <View style={styles.section}>
@@ -298,11 +613,26 @@ export default function App() {
                   </TouchableOpacity>
                 )}
               </View>
+              {asset && (
+                <View style={styles.qualityRow}>
+                  {(() => {
+                    const meta = getQualityMeta(qualityChecks[mod.key], qualityLoading);
+                    return (
+                      <View style={[styles.qualityChip, { backgroundColor: meta.backgroundColor, borderColor: meta.color }]}>
+                        <View style={[styles.qualityDot, { backgroundColor: meta.color }]} />
+                        <Text style={[styles.qualityChipText, { color: meta.color }]}>{meta.label}</Text>
+                      </View>
+                    );
+                  })()}
+                </View>
+              )}
               {asset ? (
                 <Image source={{ uri: asset.uri }} style={styles.modalityImage} contentFit="cover" />
               ) : (
                 <View style={styles.modalityPlaceholder}>
+                  <CaptureGuide modality={mod.key} />
                   <Text style={styles.modalityHint}>{mod.hint}</Text>
+                  <Text style={styles.modalityHintSecondary}>Quality meter will update after capture</Text>
                 </View>
               )}
               <View style={styles.modalityActions}>
@@ -348,6 +678,19 @@ export default function App() {
         <Text style={styles.helpText}>Use all three captures for the trained multimodal model, or start with one and add more later.</Text>
       </View>
 
+      {retakeNotice && (
+        <View style={styles.retakeCard}>
+          <Text style={styles.retakeTitle}>{retakeNotice.title}</Text>
+          {retakeNotice.items.map((item, idx) => (
+            <View key={idx} style={styles.retakeRow}>
+              <Text style={styles.retakeBullet}>•</Text>
+              <Text style={styles.retakeText}>{item}</Text>
+            </View>
+          ))}
+          <Text style={styles.retakeFooter}>Retake the flagged image(s), then run Analyze again.</Text>
+        </View>
+      )}
+
       {result && (
         <View style={[styles.resultCard, result.healthColor && { borderLeftColor: result.healthColor }]}>
           <View style={styles.resultHead}>
@@ -390,6 +733,52 @@ export default function App() {
       <View style={styles.footer}>
         <Text style={styles.footerText}>HemoLens</Text>
         <Text style={styles.footerSub}>Screening estimate only · not a diagnosis</Text>
+      </View>
+
+      <View style={styles.historyCard}>
+        <View style={styles.historyHeader}>
+          <View>
+            <Text style={styles.historyTitle}>History & trends</Text>
+            <Text style={styles.historySubtitle}>Stored locally on this device</Text>
+          </View>
+          <TouchableOpacity style={styles.exportBtn} onPress={exportHistory} activeOpacity={0.85}>
+            <Text style={styles.exportBtnText}>Export CSV</Text>
+          </TouchableOpacity>
+        </View>
+
+        {historyLoading ? (
+          <Text style={styles.historyEmpty}>Loading readings…</Text>
+        ) : history.length === 0 ? (
+          <Text style={styles.historyEmpty}>Your recent readings will appear here after each successful analyze.</Text>
+        ) : (
+          <>
+            {buildHistorySummary(history) && (
+              <View style={styles.trendCard}>
+                <Text style={styles.trendLabel}>Trend</Text>
+                <Text style={styles.trendValue}>
+                  {buildHistorySummary(history).label} {Math.abs(buildHistorySummary(history).delta).toFixed(1)} g/dL
+                </Text>
+                <Text style={styles.trendText}>Compared with the last few local readings.</Text>
+              </View>
+            )}
+
+            {history.slice(0, 5).map((entry, idx) => (
+              <View key={`${entry.date}-${idx}`} style={styles.historyRow}>
+                <View style={styles.historyRowMain}>
+                  <Text style={styles.historyDate}>{formatHistoryDate(entry.date)}</Text>
+                  <Text style={styles.historyMeta}>
+                    {entry.modalitiesUsed?.join(' · ') || 'eye'}
+                  </Text>
+                </View>
+                <View style={styles.historyValueWrap}>
+                  <Text style={styles.historyValue}>{entry.hemoglobin.toFixed(1)}</Text>
+                  <Text style={styles.historyUnit}>g/dL</Text>
+                </View>
+              </View>
+            ))}
+          </>
+        )}
+        <Text style={styles.historyNote}>Use export for clinician review. These readings are screening estimates only.</Text>
       </View>
     </ScrollView>
   );
@@ -453,6 +842,18 @@ const styles = StyleSheet.create({
   modelChipText: { fontSize: 12, fontWeight: '700', color: colors.textSecondary },
   modelChipTextActive: { color: '#FFFFFF' },
   modelBannerCopy: { marginTop: 10, fontSize: 12, color: colors.textSecondary, lineHeight: 18 },
+  qualityBanner: {
+    marginTop: 12,
+    backgroundColor: '#FFF7ED',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#FDBA74',
+  },
+  qualityBannerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
+  qualityBannerTitle: { fontSize: 14, fontWeight: '800', color: colors.text },
+  qualityBannerCount: { fontSize: 12, fontWeight: '700', color: '#C2410C' },
+  qualityBannerCopy: { marginTop: 8, fontSize: 12, color: colors.textSecondary, lineHeight: 18 },
   section: { paddingHorizontal: 24, paddingTop: 20 },
   modalityCard: {
     backgroundColor: colors.surface,
@@ -465,6 +866,18 @@ const styles = StyleSheet.create({
   modalityHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   modalityLabel: { fontSize: 16, fontWeight: '700', color: colors.text },
   clearText: { fontSize: 13, color: colors.primary, fontWeight: '600' },
+  qualityRow: { marginBottom: 8, flexDirection: 'row', alignItems: 'center' },
+  qualityChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  qualityDot: { width: 8, height: 8, borderRadius: 4 },
+  qualityChipText: { fontSize: 12, fontWeight: '700' },
   modalityImage: { width: '100%', height: 140, borderRadius: 10, backgroundColor: colors.border },
   modalityPlaceholder: {
     height: 100,
@@ -475,6 +888,108 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   modalityHint: { fontSize: 12, color: colors.textSecondary, textAlign: 'center' },
+    modalityHintSecondary: { fontSize: 11, color: colors.textMuted, textAlign: 'center', marginTop: 4 },
+  captureGuide: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  captureGuideLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  eyeGuideFrame: {
+    width: 128,
+    height: 38,
+    borderRadius: 24,
+    borderWidth: 1.5,
+    borderColor: '#7DD3FC',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.55)',
+  },
+  eyeGuideShape: {
+    width: 84,
+    height: 24,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFF',
+  },
+  eyeGuidePupil: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: colors.primary,
+  },
+  nailGuideFrame: {
+    width: 98,
+    height: 56,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: '#FDBA74',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.55)',
+  },
+  nailGuidePlate: {
+    width: 42,
+    height: 26,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#EA580C',
+    backgroundColor: '#FFF7ED',
+  },
+  nailGuideCuticle: {
+    width: 28,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#FDBA74',
+    marginTop: 4,
+  },
+  palmGuideFrame: {
+    width: 108,
+    height: 68,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: '#86EFAC',
+    backgroundColor: 'rgba(255,255,255,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  palmGuideThumb: {
+    position: 'absolute',
+    left: 18,
+    top: 20,
+    width: 14,
+    height: 24,
+    borderRadius: 8,
+    backgroundColor: '#BBF7D0',
+    transform: [{ rotate: '-22deg' }],
+  },
+  palmGuideFingerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 5,
+    marginBottom: 4,
+  },
+  palmGuideFinger: {
+    width: 10,
+    height: 28,
+    borderRadius: 5,
+    backgroundColor: '#22C55E',
+  },
+  palmGuideBase: {
+    width: 42,
+    height: 18,
+    borderRadius: 10,
+    backgroundColor: '#86EFAC',
+  },
   modalityActions: { flexDirection: 'row', gap: 10, marginTop: 10 },
   modalityBtn: {
     flex: 1,
@@ -507,6 +1022,20 @@ const styles = StyleSheet.create({
   primaryBtnDisabled: { backgroundColor: colors.textMuted, opacity: 0.7 },
   primaryBtnText: { fontSize: 16, fontWeight: '600', color: '#FFF' },
   helpText: { fontSize: 12, color: colors.textMuted, textAlign: 'center', marginTop: 10 },
+  retakeCard: {
+    marginHorizontal: 24,
+    marginTop: 8,
+    borderRadius: 16,
+    padding: 16,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+  },
+  retakeTitle: { fontSize: 14, fontWeight: '800', color: '#991B1B', marginBottom: 8 },
+  retakeRow: { flexDirection: 'row', marginBottom: 6 },
+  retakeBullet: { color: '#DC2626', marginRight: 8, fontSize: 16, lineHeight: 20 },
+  retakeText: { flex: 1, fontSize: 13, color: '#7F1D1D', lineHeight: 19 },
+  retakeFooter: { marginTop: 6, fontSize: 12, color: '#991B1B', fontWeight: '600' },
   resultCard: {
     marginHorizontal: 24,
     marginTop: 8,
@@ -535,4 +1064,51 @@ const styles = StyleSheet.create({
   footer: { marginTop: 32, paddingVertical: 24, alignItems: 'center' },
   footerText: { fontSize: 13, fontWeight: '600', color: colors.textMuted },
   footerSub: { fontSize: 11, color: colors.textMuted, marginTop: 4 },
+  historyCard: {
+    marginHorizontal: 24,
+    marginTop: 16,
+    marginBottom: 24,
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  historyHeader: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 12 },
+  historyTitle: { fontSize: 16, fontWeight: '800', color: colors.text },
+  historySubtitle: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  exportBtn: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  exportBtnText: { color: '#FFF', fontSize: 13, fontWeight: '700' },
+  historyEmpty: { fontSize: 13, color: colors.textSecondary, lineHeight: 20 },
+  trendCard: {
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+  },
+  trendLabel: { fontSize: 12, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase' },
+  trendValue: { fontSize: 18, fontWeight: '800', color: colors.text, marginTop: 4 },
+  trendText: { marginTop: 4, fontSize: 12, color: colors.textSecondary, lineHeight: 18 },
+  historyRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  historyRowMain: { flex: 1, paddingRight: 12 },
+  historyDate: { fontSize: 13, fontWeight: '700', color: colors.text },
+  historyMeta: { fontSize: 11, color: colors.textMuted, marginTop: 3 },
+  historyValueWrap: { alignItems: 'flex-end' },
+  historyValue: { fontSize: 20, fontWeight: '800', color: colors.primary },
+  historyUnit: { fontSize: 11, color: colors.textMuted, marginTop: 1 },
+  historyNote: { marginTop: 12, fontSize: 11, color: colors.textMuted, lineHeight: 16 },
 });

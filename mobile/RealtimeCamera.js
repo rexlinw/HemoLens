@@ -179,7 +179,10 @@ export default function RealtimeCamera({ onClose }) {
 
         <View style={styles.guidanceWrap}>
           <View style={styles.guidanceRing} />
-          <Text style={styles.guidanceLabel}>Eye-only live mode</Text>
+          <View style={styles.guidanceEye}>
+            <View style={styles.guidanceEyePupil} />
+          </View>
+          <Text style={styles.guidanceLabel}>Align the lower eyelid inside the guide</Text>
         </View>
 
         <View style={styles.bottomSection}>
@@ -299,6 +302,23 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'rgba(13, 148, 136, 0.6)',
     marginBottom: 10,
+  },
+  guidanceEye: {
+    position: 'absolute',
+    width: 86,
+    height: 26,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.9)',
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  guidanceEyePupil: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: 'rgba(255,255,255,0.9)',
   },
   guidanceLabel: {
     fontSize: 12,
