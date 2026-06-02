@@ -18,6 +18,7 @@ import { API_BASE_URL } from './config';
 
 const HISTORY_FILE = `${FileSystem.documentDirectory}hemolens_history.json`;
 const MAX_HISTORY = 12;
+const MIN_API_MAJOR_VERSION = 3;
 
 const MODALITIES = [
   { key: 'eye', label: 'Eye', hint: 'Palpebral conjunctiva, well lit' },
@@ -84,6 +85,11 @@ function buildHistorySummary(entries) {
     label,
     delta,
   };
+}
+
+function isSupportedApiVersion(version) {
+  const major = Number(String(version || '').split('.')[0]);
+  return Number.isFinite(major) && major >= MIN_API_MAJOR_VERSION;
 }
 
 function CaptureGuide({ modality }) {
@@ -302,12 +308,28 @@ function buildRetakeNotice(validation, fallbackMessage) {
     setRetakeNotice(null);
 
     try {
+      let rootData = {};
       let healthData = {};
+      try {
+        const rootRes = await axios.get(`${API_BASE_URL}/`, { timeout: 10000 });
+        rootData = rootRes.data || {};
+      } catch (_) {
+        /* keep empty; health check below may still explain the state */
+      }
       try {
         const healthRes = await axios.get(`${API_BASE_URL}/health`, { timeout: 10000 });
         healthData = healthRes.data || {};
       } catch (_) {
         /* use multimodal endpoint and fall back if needed */
+      }
+
+      if (!isSupportedApiVersion(rootData.version)) {
+        Alert.alert(
+          'Backend update required',
+          'This server is still on an older API. Please redeploy the latest backend before running predictions.'
+        );
+        setApiStatus('error');
+        return;
       }
 
       const multimodalAvailable = healthData.multimodal_loaded === true;
