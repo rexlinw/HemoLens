@@ -389,8 +389,8 @@ function buildRetakeNotice(validation, fallbackMessage) {
             }
           } else if (isLegacyApiError(multimodalError) && hasNailOrPalm) {
             Alert.alert(
-              'Server update required',
-              'Nail and palm analysis needs the latest backend. Use eye-only capture or redeploy the backend from the latest main branch.'
+              'Backend still updating',
+              'This server is running the older eye-only API. Redeploy the backend from the latest main branch, then try nail or palm again.'
             );
             setApiStatus('error');
             return;
