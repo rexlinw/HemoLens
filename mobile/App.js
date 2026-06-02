@@ -382,11 +382,18 @@ function buildRetakeNotice(validation, fallbackMessage) {
         try {
           response = await tryMultimodalPost();
         } catch (multimodalError) {
-          if (isLegacyApiError(multimodalError) && images.eye) {
+          if (isLegacyApiError(multimodalError) && images.eye && !hasNailOrPalm) {
             response = await predictEyeOnly();
             if (!response) {
               return;
             }
+          } else if (isLegacyApiError(multimodalError) && hasNailOrPalm) {
+            Alert.alert(
+              'Server update required',
+              'Nail and palm analysis needs the latest backend. Use eye-only capture or redeploy the backend from the latest main branch.'
+            );
+            setApiStatus('error');
+            return;
           } else {
             throw multimodalError;
           }

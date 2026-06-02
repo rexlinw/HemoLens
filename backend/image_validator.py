@@ -308,8 +308,9 @@ def validate_multimodal_inputs(
     palm: Optional[np.ndarray] = None,
 ) -> Tuple[Dict[str, ValidationResult], List[str], Optional[str]]:
     """
-    Validate each provided modality. Returns per-modality results, list of
-    accepted modality keys, and an error message if none are valid.
+    Validate each provided modality. A request is accepted only when every
+    supplied modality passes validation; otherwise random or wrong-category
+    images could be silently dropped while the model still returns a number.
     """
     results: Dict[str, ValidationResult] = {}
     accepted: List[str] = []
@@ -339,8 +340,11 @@ def validate_multimodal_inputs(
         else:
             errors.append(f"Palm: {r.message}")
 
-    if not accepted:
+    if errors:
         msg = " ".join(errors) if errors else "No valid clinical images provided."
         return results, [], msg
+
+    if not accepted:
+        return results, [], "No valid clinical images provided."
 
     return results, accepted, None
