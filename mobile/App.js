@@ -63,6 +63,8 @@ export default function App() {
   const [result, setResult] = useState(null);
   const [apiStatus, setApiStatus] = useState('unknown');
   const [useRealtimeMode, setUseRealtimeMode] = useState(false);
+  const selectedModalities = MODALITIES.filter((m) => images[m.key]).map((m) => m.label);
+  const allModalitiesSelected = selectedModalities.length === MODALITIES.length;
 
   React.useEffect(() => {
     checkApiHealth();
@@ -180,7 +182,7 @@ export default function App() {
           if (isLegacyApiError(multimodalError) && images.eye) {
             Alert.alert(
               'Eye-only mode',
-              'Server is still on API v1. Using eye image only. Redeploy Render from latest main for nail+palm.'
+              'Server is missing the multimodal route. Using the eye image only until Render is redeployed from main.'
             );
             response = await predictEyeOnly();
           } else {
@@ -260,6 +262,27 @@ export default function App() {
           </View>
         </View>
         <Text style={styles.subtitle}>Multimodal anemia screening — eye, nail & palm</Text>
+        <View style={styles.modelBanner}>
+          <View style={styles.modelBannerTop}>
+            <Text style={styles.modelBannerTitle}>Trained on all three modalities</Text>
+            <Text style={styles.modelBannerMeta}>
+              {selectedModalities.length}/3 selected
+            </Text>
+          </View>
+          <View style={styles.modelChips}>
+            {MODALITIES.map((mod) => {
+              const active = Boolean(images[mod.key]);
+              return (
+                <View key={mod.key} style={[styles.modelChip, active && styles.modelChipActive]}>
+                  <Text style={[styles.modelChipText, active && styles.modelChipTextActive]}>{mod.label}</Text>
+                </View>
+              );
+            })}
+          </View>
+          <Text style={styles.modelBannerCopy}>
+            Best accuracy comes from eye + nail + palm together. You can still analyze with any subset.
+          </Text>
+        </View>
       </View>
 
       <View style={styles.section}>
@@ -317,10 +340,12 @@ export default function App() {
           {loading ? (
             <ActivityIndicator color="#FFF" size="small" />
           ) : (
-            <Text style={styles.primaryBtnText}>Analyze (multimodal)</Text>
+            <Text style={styles.primaryBtnText}>
+              {allModalitiesSelected ? 'Analyze eye + nail + palm' : 'Analyze selected images'}
+            </Text>
           )}
         </TouchableOpacity>
-        <Text style={styles.helpText}>Add one or more images for best accuracy with all three.</Text>
+        <Text style={styles.helpText}>Use all three captures for the trained multimodal model, or start with one and add more later.</Text>
       </View>
 
       {result && (
@@ -401,6 +426,33 @@ const styles = StyleSheet.create({
   statusDot: { width: 8, height: 8, borderRadius: 4 },
   statusText: { fontSize: 12, fontWeight: '600' },
   subtitle: { fontSize: 14, color: colors.textSecondary, lineHeight: 20 },
+  modelBanner: {
+    marginTop: 16,
+    backgroundColor: colors.primaryLight,
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  modelBannerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
+  modelBannerTitle: { fontSize: 14, fontWeight: '800', color: colors.text },
+  modelBannerMeta: { fontSize: 12, color: colors.textSecondary, fontWeight: '600' },
+  modelChips: { flexDirection: 'row', gap: 8, marginTop: 10, flexWrap: 'wrap' },
+  modelChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#B7E4DA',
+  },
+  modelChipActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  modelChipText: { fontSize: 12, fontWeight: '700', color: colors.textSecondary },
+  modelChipTextActive: { color: '#FFFFFF' },
+  modelBannerCopy: { marginTop: 10, fontSize: 12, color: colors.textSecondary, lineHeight: 18 },
   section: { paddingHorizontal: 24, paddingTop: 20 },
   modalityCard: {
     backgroundColor: colors.surface,

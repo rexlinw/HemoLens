@@ -46,6 +46,20 @@ multimodal_loaded = False
 EYE_QUALITY_THRESHOLD = 0.65
 
 
+def get_multimodal_summary() -> dict:
+    cfg = multimodal_config or {}
+    return {
+        "model_type": cfg.get("model_type", "unknown"),
+        "modalities": cfg.get("modalities", ["eye", "nail", "palm"]),
+        "total_features": cfg.get("total_features", 97),
+        "r2": cfg.get("r2"),
+        "mae": cfg.get("mae"),
+        "training_samples": cfg.get("training_samples"),
+        "test_samples": cfg.get("test_samples"),
+        "target_met": cfg.get("target_met"),
+    }
+
+
 def decode_image_bytes(contents: bytes) -> np.ndarray:
     try:
         image = Image.open(io.BytesIO(contents)).convert("RGB")
@@ -101,7 +115,13 @@ async def startup_event():
         if models_loaded:
             print("  Eye-only: Ridge (46 features)")
         if multimodal_loaded:
-            print("  Multimodal: eye + nail + palm (97 features)")
+            summary = get_multimodal_summary()
+            print(
+                "  Multimodal: "
+                f"{'+'.join(summary['modalities'])} "
+                f"({summary['total_features']} features, "
+                f"R²={summary['r2']}, MAE={summary['mae']} g/dL)"
+            )
     else:
         print("\n✗ Failed to load models!")
     print("="*70 + "\n")
@@ -112,6 +132,7 @@ async def root():
     return {
         "name": "HemoLens API v3.0",
         "description": "Multimodal non-invasive hemoglobin estimation",
+        "model_version": multimodal_config.get("model_type") if multimodal_config else None,
         "endpoints": {
             "GET /health": "Check API health and model status",
             "GET /info": "Get model information",
@@ -126,12 +147,13 @@ async def root():
 @app.get("/health")
 async def health_check():
     healthy = models_loaded or multimodal_loaded
+    summary = get_multimodal_summary() if multimodal_loaded else None
     return {
         "status": "healthy" if healthy else "unhealthy",
         "models_loaded": models_loaded,
         "multimodal_loaded": multimodal_loaded,
         "model_type": "Multimodal (eye+nail+palm)" if multimodal_loaded else "Ridge (eye only)",
-        "multimodal_metrics": multimodal_config if multimodal_config else None,
+        "multimodal_metrics": summary,
         "eye_metrics": {"r2": 0.6267, "mae": 0.96, "unit": "g/dL"} if models_loaded else None,
     }
 
@@ -143,7 +165,7 @@ async def get_model_info():
     return {
         "model_name": "HemoLens Multimodal",
         "version": "3.0",
-        "multimodal": multimodal_config,
+        "multimodal": get_multimodal_summary() if multimodal_loaded else None,
         "multimodal_loaded": multimodal_loaded,
         "features": {
             "count": len(feature_names),
@@ -160,20 +182,20 @@ async def get_model_info():
             ]
         },
         "performance": {
-            "r2_score": 0.6267,
-            "mae": 0.96,
-            "rmse": 1.3745,
-            "mape": 7.49,
+            "r2_score": multimodal_config.get("r2") if multimodal_config else None,
+            "mae": multimodal_config.get("mae") if multimodal_config else None,
+            "rmse": None,
+            "mape": None,
             "unit": "g/dL"
         },
         "training_data": {
-            "total_samples": 145,
-            "train_samples": 116,
-            "test_samples": 29,
-            "regions": ["India (63)", "Italy (82)"],
-            "hemoglobin_range": [7.0, 17.4],
-            "hemoglobin_mean": 12.61,
-            "hemoglobin_std": 2.38
+            "total_samples": (multimodal_config.get("training_samples", 0) + multimodal_config.get("test_samples", 0)) if multimodal_config else None,
+            "train_samples": multimodal_config.get("training_samples") if multimodal_config else None,
+            "test_samples": multimodal_config.get("test_samples") if multimodal_config else None,
+            "regions": ["India", "Italy", "Ghana / standard nail", "Palm anemic / non-anemic"],
+            "hemoglobin_range": [6.0, 18.0],
+            "hemoglobin_mean": None,
+            "hemoglobin_std": None
         }
     }
 
@@ -413,6 +435,7 @@ async def predict_batch(files: list[UploadFile] = File(...)):
 
 @app.get("/models/status")
 async def models_status():
+    summary = get_multimodal_summary() if multimodal_loaded else None
     return {
         "ridge_model": {
             "loaded": ridge_model is not None,
@@ -423,7 +446,7 @@ async def models_status():
         },
         "multimodal_model": {
             "loaded": multimodal_loaded,
-            "config": multimodal_config,
+            "config": summary,
             "status": "PRIMARY" if multimodal_loaded else "NOT_LOADED",
         },
         "overall_status": "Ready" if (models_loaded or multimodal_loaded) else "Not Ready",

@@ -5,47 +5,10 @@
     "nail",
     "palm"
   ],
-  "feature_dims": {
-    "eye": 46,
-    "nail": 25,
-    "palm": 26
-  },
   "total_features": 97,
   "r2": 0.8532,
   "mae": 0.58,
   "training_samples": 7033,
   "test_samples": 1756,
-  "target_r2": 0.8,
-  "target_met": true,
-  "eye_hb_stats": {
-    "mean": 12.79709677419355,
-    "std": 2.357154684619704,
-    "anemic_mean": 10.073026315789475,
-    "anemic_std": 1.1912344545148403,
-    "healthy_mean": 14.265390070921985,
-    "healthy_std": 1.2769125650993123,
-    "n": 217
-  },
-  "all_models": {
-    "HistGB": {
-      "r2": 0.8532,
-      "mae": 0.5758,
-      "rmse": 0.8186
-    },
-    "GB": {
-      "r2": 0.8098,
-      "mae": 0.6827,
-      "rmse": 0.932
-    },
-    "Ridge": {
-      "r2": 0.1615,
-      "mae": 1.7724,
-      "rmse": 1.9566
-    },
-    "Ensemble": {
-      "r2": 0.813,
-      "mae": 0.6952,
-      "rmse": 0.924
-    }
-  }
+  "target_met": true
 }

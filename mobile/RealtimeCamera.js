@@ -169,8 +169,8 @@ export default function RealtimeCamera({ onClose }) {
 
       <View style={styles.overlay} pointerEvents="box-none">
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Live detection</Text>
-          <Text style={styles.headerSubtitle}>Position eye in frame</Text>
+          <Text style={styles.headerTitle}>Live eye preview</Text>
+          <Text style={styles.headerSubtitle}>Eye-only capture for the fallback model</Text>
           <View style={[styles.statusPill, { backgroundColor: connectionStatus === 'connected' ? 'rgba(5, 150, 105, 0.25)' : 'rgba(220, 38, 38, 0.25)' }]}>
             <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
             <Text style={styles.statusPillText}>{connectionStatus === 'connected' ? 'Connected' : 'Offline'}</Text>
@@ -179,7 +179,7 @@ export default function RealtimeCamera({ onClose }) {
 
         <View style={styles.guidanceWrap}>
           <View style={styles.guidanceRing} />
-          <Text style={styles.guidanceLabel}>Palpebral conjunctiva</Text>
+          <Text style={styles.guidanceLabel}>Eye-only live mode</Text>
         </View>
 
         <View style={styles.bottomSection}>
