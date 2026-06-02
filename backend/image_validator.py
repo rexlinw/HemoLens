@@ -130,7 +130,7 @@ def validate_eye(image: np.ndarray, eye_detector: EyeDetector) -> ValidationResu
 
     face_x, face_y, face_w, face_h = face_box
     face_area_ratio = float((face_w * face_h) / float(rgb.shape[0] * rgb.shape[1] + 1e-6))
-    if face_area_ratio < 0.02 or face_area_ratio > 0.70:
+    if face_area_ratio < 0.04 or face_area_ratio > 0.55:
         return ValidationResult(
             False,
             quality,
@@ -139,7 +139,7 @@ def validate_eye(image: np.ndarray, eye_detector: EyeDetector) -> ValidationResu
 
     face_roi = rgb[face_y:face_y + face_h, face_x:face_x + face_w]
     face_skin_fraction = _skin_fraction(face_roi)
-    if face_skin_fraction < 0.03:
+    if face_skin_fraction < 0.05:
         return ValidationResult(
             False,
             quality,
@@ -147,7 +147,7 @@ def validate_eye(image: np.ndarray, eye_detector: EyeDetector) -> ValidationResu
         )
 
     face_aspect = float(face_w) / float(face_h + 1e-6)
-    if face_aspect < 0.65 or face_aspect > 1.55:
+    if face_aspect < 0.75 or face_aspect > 1.45:
         return ValidationResult(
             False,
             quality,
@@ -200,7 +200,7 @@ def validate_nail(image: np.ndarray) -> ValidationResult:
         return ValidationResult(False, 0.0, basic)
 
     skin_frac = _skin_fraction(rgb)
-    if skin_frac < 0.08:
+    if skin_frac < 0.12:
         return ValidationResult(
             False,
             skin_frac,
@@ -213,21 +213,21 @@ def validate_nail(image: np.ndarray) -> ValidationResult:
     num_contours = morph.get("nail_num_contours", 0.0)
     circularity = morph.get("nail_circularity", 0.0)
 
-    if largest_pct < 0.02 or detected_area < 0.03:
+    if largest_pct < 0.03 or detected_area < 0.04:
         return ValidationResult(
             False,
             detected_area,
             "Fingernail not detected. Center the nail bed in frame with good lighting.",
         )
 
-    if detected_area > 0.42 or num_contours > 8:
+    if detected_area > 0.35 or num_contours > 6:
         return ValidationResult(
             False,
             detected_area,
             "Could not isolate a fingernail. Use a single nail on plain background.",
         )
 
-    if largest_pct < detected_area * 0.25:
+    if largest_pct < detected_area * 0.30:
         return ValidationResult(
             False,
             largest_pct,
@@ -237,14 +237,14 @@ def validate_nail(image: np.ndarray) -> ValidationResult:
     color = NailFeatureExtractor.extract_color_features(rgb)
     rg_diff = color.get("nail_rg_diff", 0.0)
     sat = color.get("nail_saturation_mean", 0.0)
-    if rg_diff < 2.0 or sat < 25:
+    if rg_diff < 3.5 or sat < 30:
         return ValidationResult(
             False,
             detected_area,
             "Image does not match expected nail color patterns.",
         )
 
-    if circularity < 0.05 and largest_pct < 0.08:
+    if circularity < 0.08 and largest_pct < 0.10:
         return ValidationResult(
             False,
             circularity,
@@ -262,7 +262,7 @@ def validate_palm(image: np.ndarray) -> ValidationResult:
         return ValidationResult(False, 0.0, basic)
 
     skin_frac = _skin_fraction(rgb)
-    if skin_frac < 0.12:
+    if skin_frac < 0.18:
         return ValidationResult(
             False,
             skin_frac,
@@ -275,14 +275,14 @@ def validate_palm(image: np.ndarray) -> ValidationResult:
     area_ratio = feats.get("palm_area", 0.0) / float(h * w + 1e-6)
     solidity = feats.get("palm_solidity", 0.0)
 
-    if area_ratio < 0.12:
+    if area_ratio < 0.18:
         return ValidationResult(
             False,
             area_ratio,
             "Palm region too small. Fill the frame with your open palm.",
         )
 
-    if solidity < 0.55:
+    if solidity < 0.65:
         return ValidationResult(
             False,
             solidity,
