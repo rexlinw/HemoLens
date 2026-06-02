@@ -7,8 +7,8 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  Image,
 } from 'react-native';
-import { Image } from 'expo-image';
 import * as FileSystem from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import axios from 'axios';
@@ -528,7 +528,7 @@ function buildRetakeNotice(validation, fallbackMessage) {
                 )}
               </View>
               {asset ? (
-                <Image source={{ uri: asset.uri }} style={styles.modalityImage} contentFit="cover" />
+                <Image source={{ uri: asset.uri }} style={styles.modalityImage} resizeMode="cover" />
               ) : (
                 <View style={styles.modalityPlaceholder}>
                   <CaptureGuide modality={mod.key} />
