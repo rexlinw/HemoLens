@@ -57,23 +57,101 @@ def _skin_fraction(rgb: np.ndarray) -> float:
     return float((mask > 0).mean())
 
 
+def _largest_box(boxes):
+    return max(boxes, key=lambda box: box[2] * box[3]) if len(boxes) else None
+
+
+def _eyes_look_plausible(face_box, eye_boxes) -> bool:
+    if face_box is None or len(eye_boxes) < 2:
+        return False
+
+    x, y, w, h = face_box
+    sorted_eyes = sorted(eye_boxes, key=lambda box: box[0])[:2]
+    (x1, y1, w1, h1), (x2, y2, w2, h2) = sorted_eyes
+
+    c1x = x1 + w1 / 2.0
+    c1y = y1 + h1 / 2.0
+    c2x = x2 + w2 / 2.0
+    c2y = y2 + h2 / 2.0
+
+    face_w = float(w)
+    face_h = float(h)
+    face_center_x = x + face_w / 2.0
+    face_center_y = y + face_h / 2.0
+
+    eye_span = abs(c2x - c1x)
+    eye_mid_y = (c1y + c2y) / 2.0
+
+    if not (0.18 * face_w <= eye_span <= 0.92 * face_w):
+        return False
+
+    if abs(c1y - c2y) > 0.22 * face_h:
+        return False
+
+    if eye_mid_y > y + 0.72 * face_h:
+        return False
+
+    if abs((c1x + c2x) / 2.0 - face_center_x) > 0.30 * face_w:
+        return False
+
+    if abs(eye_mid_y - face_center_y) > 0.28 * face_h:
+        return False
+
+    return True
+
+
 def validate_eye(image: np.ndarray, eye_detector: EyeDetector) -> ValidationResult:
     rgb = _to_rgb(image)
     basic = _basic_image_checks(rgb)
     if basic:
         return ValidationResult(False, 0.0, basic)
 
+    gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    enhanced = clahe.apply(gray)
+
+    faces = eye_detector.face_cascade.detectMultiScale(
+        enhanced,
+        scaleFactor=1.08,
+        minNeighbors=8,
+        minSize=(60, 60),
+    )
+    face_box = _largest_box(faces)
+
     detected = eye_detector.detect_eyes(rgb)
     quality = float(eye_detector.get_eye_quality_score(rgb))
 
-    if not detected:
+    if face_box is None or not detected:
         return ValidationResult(
             False,
             quality,
             "No clear eyes detected. Use a close-up, well-lit eye or conjunctiva photo.",
         )
 
-    if quality < 0.65:
+    face_x, face_y, face_w, face_h = face_box
+    face_area_ratio = float((face_w * face_h) / float(rgb.shape[0] * rgb.shape[1] + 1e-6))
+    if face_area_ratio < 0.02 or face_area_ratio > 0.70:
+        return ValidationResult(
+            False,
+            quality,
+            "Image does not look like a close-up eye photo. Fill more of the frame with the eye area.",
+        )
+
+    roi_gray = enhanced[face_y:face_y + face_h, face_x:face_x + face_w]
+    eye_boxes = eye_detector.eye_cascade.detectMultiScale(
+        roi_gray,
+        scaleFactor=1.08,
+        minNeighbors=10,
+        minSize=(24, 24),
+    )
+    if not _eyes_look_plausible(face_box, eye_boxes):
+        return ValidationResult(
+            False,
+            quality,
+            "Image does not look like a true eye/conjunctiva capture.",
+        )
+
+    if quality < 0.75:
         return ValidationResult(
             False,
             quality,
@@ -87,7 +165,7 @@ def validate_eye(image: np.ndarray, eye_detector: EyeDetector) -> ValidationResu
     center = hsv[max(0, cy - r):cy + r, max(0, cx - r):cx + r]
     if center.size > 0:
         sat_mean = float(center[:, :, 1].mean())
-        if sat_mean < 20:
+        if sat_mean < 20 or sat_mean > 170:
             return ValidationResult(
                 False,
                 quality,
