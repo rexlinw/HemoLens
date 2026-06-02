@@ -18,7 +18,6 @@ import { API_BASE_URL } from './config';
 
 const HISTORY_FILE = `${FileSystem.documentDirectory}hemolens_history.json`;
 const MAX_HISTORY = 12;
-const MIN_API_MAJOR_VERSION = 3;
 
 const MODALITIES = [
   { key: 'eye', label: 'Eye', hint: 'Palpebral conjunctiva, well lit' },
@@ -87,19 +86,10 @@ function buildHistorySummary(entries) {
   };
 }
 
-function isSupportedApiVersion(version) {
-  const major = Number(String(version || '').split('.')[0]);
-  return Number.isFinite(major) && major >= MIN_API_MAJOR_VERSION;
-}
-
 async function ensureSupportedBackend() {
   try {
     const rootRes = await axios.get(`${API_BASE_URL}/`, { timeout: 10000 });
-    const rootData = rootRes.data || {};
-    if (!isSupportedApiVersion(rootData.version)) {
-      return { ok: false, reason: 'stale_version' };
-    }
-    return { ok: true, rootData };
+    return { ok: true, rootData: rootRes.data || {} };
   } catch (_) {
     return { ok: false, reason: 'unreachable' };
   }
@@ -300,8 +290,8 @@ function buildRetakeNotice(validation, fallbackMessage) {
     const backendCheck = await ensureSupportedBackend();
     if (!backendCheck.ok) {
       Alert.alert(
-        'Backend update required',
-        'This server is still on an older API. Please redeploy the latest backend before running predictions.'
+        'Backend unavailable',
+        'The prediction server could not be reached right now.'
       );
       setApiStatus('error');
       return null;
@@ -336,8 +326,8 @@ function buildRetakeNotice(validation, fallbackMessage) {
       const backendCheck = await ensureSupportedBackend();
       if (!backendCheck.ok) {
         Alert.alert(
-          'Backend update required',
-          'This server is still on an older API. Please redeploy the latest backend before running predictions.'
+          'Backend unavailable',
+          'The prediction server could not be reached right now.'
         );
         setApiStatus('error');
         return;
@@ -348,15 +338,6 @@ function buildRetakeNotice(validation, fallbackMessage) {
         healthData = healthRes.data || {};
       } catch (_) {
         /* use multimodal endpoint and fall back if needed */
-      }
-
-      if (!isSupportedApiVersion(rootData.version)) {
-        Alert.alert(
-          'Backend update required',
-          'This server is still on an older API. Please redeploy the latest backend before running predictions.'
-        );
-        setApiStatus('error');
-        return;
       }
 
       const multimodalAvailable = healthData.multimodal_loaded === true;
