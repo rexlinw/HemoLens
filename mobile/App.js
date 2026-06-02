@@ -92,6 +92,19 @@ function isSupportedApiVersion(version) {
   return Number.isFinite(major) && major >= MIN_API_MAJOR_VERSION;
 }
 
+async function ensureSupportedBackend() {
+  try {
+    const rootRes = await axios.get(`${API_BASE_URL}/`, { timeout: 10000 });
+    const rootData = rootRes.data || {};
+    if (!isSupportedApiVersion(rootData.version)) {
+      return { ok: false, reason: 'stale_version' };
+    }
+    return { ok: true, rootData };
+  } catch (_) {
+    return { ok: false, reason: 'unreachable' };
+  }
+}
+
 function CaptureGuide({ modality }) {
   if (modality === 'eye') {
     return (
@@ -284,6 +297,16 @@ function buildRetakeNotice(validation, fallbackMessage) {
   const hasAnyImage = MODALITIES.some((m) => images[m.key]);
 
   const predictEyeOnly = async () => {
+    const backendCheck = await ensureSupportedBackend();
+    if (!backendCheck.ok) {
+      Alert.alert(
+        'Backend update required',
+        'This server is still on an older API. Please redeploy the latest backend before running predictions.'
+      );
+      setApiStatus('error');
+      return null;
+    }
+
     const formData = new FormData();
     formData.append('file', {
       uri: images.eye.uri,
@@ -310,12 +333,16 @@ function buildRetakeNotice(validation, fallbackMessage) {
     try {
       let rootData = {};
       let healthData = {};
-      try {
-        const rootRes = await axios.get(`${API_BASE_URL}/`, { timeout: 10000 });
-        rootData = rootRes.data || {};
-      } catch (_) {
-        /* keep empty; health check below may still explain the state */
+      const backendCheck = await ensureSupportedBackend();
+      if (!backendCheck.ok) {
+        Alert.alert(
+          'Backend update required',
+          'This server is still on an older API. Please redeploy the latest backend before running predictions.'
+        );
+        setApiStatus('error');
+        return;
       }
+      rootData = backendCheck.rootData || {};
       try {
         const healthRes = await axios.get(`${API_BASE_URL}/health`, { timeout: 10000 });
         healthData = healthRes.data || {};
@@ -376,12 +403,18 @@ function buildRetakeNotice(validation, fallbackMessage) {
         } catch (multimodalError) {
           if (isLegacyApiError(multimodalError) && images.eye) {
             response = await predictEyeOnly();
+            if (!response) {
+              return;
+            }
           } else {
             throw multimodalError;
           }
         }
       } else if (images.eye) {
         response = await predictEyeOnly();
+        if (!response) {
+          return;
+        }
       } else {
         Alert.alert(
           'Server update required',
