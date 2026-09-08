@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import axios from 'axios';
-import { API_BASE_URL } from './config';
+import { API_BASE_URL, probeBackend } from './config';
 const CAPTURE_INTERVAL = 1500;
 const MAX_HISTORY = 5;
 
@@ -21,8 +21,8 @@ export default function RealtimeCamera({ onClose }) {
   const [predictions, setPredictions] = useState([]);
   const [averageHemoglobin, setAverageHemoglobin] = useState(null);
   const [frameCount, setFrameCount] = useState(0);
-  const [connectionStatus, setConnectionStatus] = useState('checking');
-  const [statusColor, setStatusColor] = useState('#FFC107');
+  const [connectionStatus, setConnectionStatus] = useState('ready');
+  const [statusColor, setStatusColor] = useState('#6B7280');
   const captureIntervalRef = useRef(null);
 
   const [permission, requestPermission] = useCameraPermissions();
@@ -54,10 +54,13 @@ export default function RealtimeCamera({ onClose }) {
 
   const checkAPIConnection = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/health`, { timeout: 5000 });
-      if (response.data.status === 'healthy') {
+      const backendCheck = await probeBackend();
+      if (backendCheck.ok) {
         setConnectionStatus('connected');
         setStatusColor('#4CAF50');
+      } else {
+        setConnectionStatus('error');
+        setStatusColor('#FF5252');
       }
     } catch (error) {
       setConnectionStatus('error');
@@ -173,7 +176,7 @@ export default function RealtimeCamera({ onClose }) {
           <Text style={styles.headerSubtitle}>Eye-only capture for the fallback model</Text>
           <View style={[styles.statusPill, { backgroundColor: connectionStatus === 'connected' ? 'rgba(5, 150, 105, 0.25)' : 'rgba(220, 38, 38, 0.25)' }]}>
             <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-            <Text style={styles.statusPillText}>{connectionStatus === 'connected' ? 'Connected' : 'Offline'}</Text>
+            <Text style={styles.statusPillText}>{connectionStatus === 'connected' ? 'Connected' : connectionStatus === 'error' ? 'Offline' : 'Ready'}</Text>
           </View>
         </View>
 

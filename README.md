@@ -68,6 +68,12 @@ Local backend:
 EXPO_PUBLIC_API_URL=http://YOUR_LAN_IP:8000 npx expo start
 ```
 
+Production backend:
+
+```bash
+EXPO_PUBLIC_API_URL=https://hemolens.onrender.com npx expo start
+```
+
 ## Train model
 
 Place datasets under `data/` as shown above, then:
@@ -90,6 +96,7 @@ See `backend/models/multimodal_config.json` for current metrics (multimodal eye+
 3. Use `render.yaml` blueprint or:
    - Build: `pip install -r backend/requirements.txt`
    - Start: `cd backend && uvicorn app:app --host 0.0.0.0 --port $PORT`
+4. Mobile app default API URL: `https://hemolens.onrender.com`
 
 ## WHO reference (g/dL)
 

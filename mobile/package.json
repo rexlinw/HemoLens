@@ -10,10 +10,10 @@
   },
   "dependencies": {
     "axios": "^1.6.0",
-    "expo": "~54.0.35",
+    "expo": "~54.0.37",
     "expo-camera": "~17.0.10",
-    "expo-constants": "~18.0.0",
-    "expo-file-system": "~19.0.23",
+    "expo-constants": "~18.0.14",
+    "expo-file-system": "~19.0.24",
     "expo-image-picker": "~17.0.11",
     "qrcode": "^1.5.4",
     "react": "19.1.0",

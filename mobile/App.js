@@ -14,7 +14,7 @@ import * as ImagePicker from 'expo-image-picker';
 import axios from 'axios';
 import { Share } from 'react-native';
 import RealtimeCamera from './RealtimeCamera';
-import { API_BASE_URL } from './config';
+import { API_BASE_URL, probeBackend } from './config';
 
 const HISTORY_FILE = `${FileSystem.documentDirectory}hemolens_history.json`;
 const MAX_HISTORY = 12;
@@ -87,12 +87,7 @@ function buildHistorySummary(entries) {
 }
 
 async function ensureSupportedBackend() {
-  try {
-    const rootRes = await axios.get(`${API_BASE_URL}/`, { timeout: 10000 });
-    return { ok: true, rootData: rootRes.data || {} };
-  } catch (_) {
-    return { ok: false, reason: 'unreachable' };
-  }
+  return probeBackend();
 }
 
 function CaptureGuide({ modality }) {
@@ -142,7 +137,7 @@ export default function App() {
   const [images, setImages] = useState({ eye: null, nail: null, palm: null });
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
-  const [apiStatus, setApiStatus] = useState('unknown');
+  const [apiStatus, setApiStatus] = useState('ready');
   const [useRealtimeMode, setUseRealtimeMode] = useState(false);
   const selectedModalities = MODALITIES.filter((m) => images[m.key]).map((m) => m.label);
   const allModalitiesSelected = selectedModalities.length === MODALITIES.length;
@@ -156,8 +151,8 @@ export default function App() {
 
   const checkApiHealth = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/health`, { timeout: 10000 });
-      setApiStatus(response.data.status === 'healthy' ? 'connected' : 'error');
+      const backendCheck = await probeBackend();
+      setApiStatus(backendCheck.ok ? 'connected' : 'disconnected');
     } catch (error) {
       setApiStatus('disconnected');
     }
@@ -296,6 +291,7 @@ function buildRetakeNotice(validation, fallbackMessage) {
       setApiStatus('error');
       return null;
     }
+    setApiStatus('connected');
 
     const formData = new FormData();
     formData.append('file', {
@@ -321,7 +317,6 @@ function buildRetakeNotice(validation, fallbackMessage) {
     setRetakeNotice(null);
 
     try {
-      let rootData = {};
       let healthData = {};
       const backendCheck = await ensureSupportedBackend();
       if (!backendCheck.ok) {
@@ -332,13 +327,8 @@ function buildRetakeNotice(validation, fallbackMessage) {
         setApiStatus('error');
         return;
       }
-      rootData = backendCheck.rootData || {};
-      try {
-        const healthRes = await axios.get(`${API_BASE_URL}/health`, { timeout: 10000 });
-        healthData = healthRes.data || {};
-      } catch (_) {
-        /* use multimodal endpoint and fall back if needed */
-      }
+      healthData = backendCheck.healthData || {};
+      setApiStatus('connected');
 
       const multimodalAvailable = healthData.multimodal_loaded === true;
       const hasNailOrPalm = Boolean(images.nail || images.palm);
@@ -387,13 +377,11 @@ function buildRetakeNotice(validation, fallbackMessage) {
             if (!response) {
               return;
             }
-          } else if (isLegacyApiError(multimodalError) && hasNailOrPalm) {
-            Alert.alert(
-              'Backend still updating',
-              'This server is running the older eye-only API. Redeploy the backend from the latest main branch, then try nail or palm again.'
-            );
-            setApiStatus('error');
-            return;
+          } else if (isLegacyApiError(multimodalError) && images.eye) {
+            response = await predictEyeOnly();
+            if (!response) {
+              return;
+            }
           } else {
             throw multimodalError;
           }
@@ -460,7 +448,7 @@ function buildRetakeNotice(validation, fallbackMessage) {
               styles.statusPill,
               {
                 backgroundColor:
-                  apiStatus === 'connected' ? '#D1FAE5' : apiStatus === 'disconnected' ? '#FEE2E2' : '#FEF3C7',
+                  apiStatus === 'connected' ? '#D1FAE5' : apiStatus === 'disconnected' ? '#FEE2E2' : '#E5E7EB',
               },
             ]}
           >
@@ -469,12 +457,12 @@ function buildRetakeNotice(validation, fallbackMessage) {
                 styles.statusDot,
                 {
                   backgroundColor:
-                    apiStatus === 'connected' ? '#059669' : apiStatus === 'disconnected' ? '#DC2626' : '#D97706',
+                    apiStatus === 'connected' ? '#059669' : apiStatus === 'disconnected' ? '#DC2626' : '#6B7280',
                 },
               ]}
             />
             <Text style={styles.statusText}>
-              {apiStatus === 'connected' ? 'Connected' : apiStatus === 'disconnected' ? 'Offline' : 'Checking…'}
+              {apiStatus === 'connected' ? 'Connected' : apiStatus === 'disconnected' ? 'Offline' : 'Ready'}
             </Text>
           </View>
         </View>
