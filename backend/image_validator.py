@@ -351,11 +351,11 @@ def validate_multimodal_inputs(
         else:
             errors.append(f"Palm: {r.message}")
 
-    if errors:
-        msg = " ".join(errors) if errors else "No valid clinical images provided."
-        return results, [], msg
-
     if not accepted:
         return results, [], "No valid clinical images provided."
+
+    if errors:
+        msg = " ".join(errors)
+        return results, accepted, msg
 
     return results, accepted, None

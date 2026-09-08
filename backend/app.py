@@ -403,6 +403,7 @@ async def predict_multimodal_endpoint(
             "model": "multimodal",
             "eye_quality_score": eye_quality,
             "processing_time_ms": int((time.time() - start_time) * 1000),
+            "warning": error_msg,
         }
 
     except Exception as e:
