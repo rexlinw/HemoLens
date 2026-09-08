@@ -86,10 +86,15 @@ def load_models():
             scaler = pickle.load(f)
         print(f"✓ Scaler loaded: {SCALER_PATH}")
 
-        eye_detector = EyeDetector()
-        print("✓ Eye detector initialized")
-        models_loaded = True
-        eye_ok = True
+        try:
+            eye_detector = EyeDetector()
+            print("✓ Eye detector initialized")
+            models_loaded = True
+            eye_ok = True
+        except Exception as e:
+            eye_detector = None
+            models_loaded = False
+            print(f"⚠ Eye detector unavailable: {e}")
     except FileNotFoundError as e:
         print(f"✗ Error loading eye models: {e}")
 

@@ -5,11 +5,56 @@ from pathlib import Path
 
 class EyeDetector:
     def __init__(self):
-        cascade_path = cv2.data.haarcascades + 'haarcascade_eye.xml'
-        self.eye_cascade = cv2.CascadeClassifier(cascade_path)
+        self.supports_cascade = bool(
+            hasattr(cv2, 'CascadeClassifier')
+            and hasattr(cv2, 'data')
+            and getattr(cv2.data, 'haarcascades', None)
+        )
 
-        face_cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-        self.face_cascade = cv2.CascadeClassifier(face_cascade_path)
+        self.eye_cascade = None
+        self.face_cascade = None
+
+        if self.supports_cascade:
+            try:
+                cascade_path = cv2.data.haarcascades + 'haarcascade_eye.xml'
+                self.eye_cascade = cv2.CascadeClassifier(cascade_path)
+
+                face_cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+                self.face_cascade = cv2.CascadeClassifier(face_cascade_path)
+
+                self.supports_cascade = not self.eye_cascade.empty() and not self.face_cascade.empty()
+            except Exception:
+                self.supports_cascade = False
+                self.eye_cascade = None
+                self.face_cascade = None
+
+    def _fallback_quality_score(self, image: np.ndarray) -> float:
+        if len(image.shape) == 3:
+            gray = cv2.cvtColor(image.astype(np.uint8), cv2.COLOR_RGB2GRAY)
+            rgb = image.astype(np.uint8)
+        else:
+            gray = image.astype(np.uint8)
+            rgb = cv2.cvtColor(gray, cv2.COLOR_GRAY2RGB)
+
+        brightness = float(gray.mean())
+        blur = float(cv2.Laplacian(gray, cv2.CV_64F).var())
+        hist = cv2.calcHist([gray], [0], None, [256], [0, 256]).flatten()
+        hist = hist / (hist.sum() + 1e-8)
+        entropy = float(-np.sum(hist[hist > 0] * np.log2(hist[hist > 0] + 1e-8)))
+
+        ycrcb = cv2.cvtColor(rgb, cv2.COLOR_RGB2YCrCb)
+        skin_mask = cv2.inRange(ycrcb, (0, 133, 77), (255, 173, 127))
+        skin_fraction = float((skin_mask > 0).mean())
+
+        brightness_score = 1.0 - min(abs(brightness - 120.0) / 120.0, 1.0)
+        blur_score = min(blur / 120.0, 1.0)
+        entropy_score = min(entropy / 6.0, 1.0)
+        skin_score = min(max(skin_fraction, 0.02) / 0.18, 1.0)
+
+        return float(max(0.0, min(1.0, 0.30 * brightness_score + 0.25 * blur_score + 0.20 * entropy_score + 0.25 * skin_score)))
+
+    def _fallback_detect_eyes(self, image: np.ndarray) -> bool:
+        return self._fallback_quality_score(image) >= 0.40
 
     def _eyes_look_plausible(self, face_box, eye_boxes) -> bool:
         if face_box is None or len(eye_boxes) < 2:
@@ -77,6 +122,9 @@ class EyeDetector:
         return best_face, best_eyes
 
     def detect_eyes(self, image: np.ndarray) -> bool:
+        if not self.supports_cascade or self.eye_cascade is None or self.face_cascade is None:
+            return self._fallback_detect_eyes(image)
+
         if len(image.shape) == 3:
             gray = cv2.cvtColor(image.astype(np.uint8), cv2.COLOR_RGB2GRAY)
         else:
@@ -88,6 +136,9 @@ class EyeDetector:
         return face_box is not None and len(eyes) >= 2
 
     def get_eye_quality_score(self, image: np.ndarray) -> float:
+        if not self.supports_cascade or self.eye_cascade is None or self.face_cascade is None:
+            return self._fallback_quality_score(image)
+
         if len(image.shape) == 3:
             gray = cv2.cvtColor(image.astype(np.uint8), cv2.COLOR_RGB2GRAY)
         else:

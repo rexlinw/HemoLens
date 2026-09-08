@@ -106,6 +106,17 @@ def validate_eye(image: np.ndarray, eye_detector: EyeDetector) -> ValidationResu
     if basic:
         return ValidationResult(False, 0.0, basic)
 
+    if not getattr(eye_detector, "supports_cascade", False):
+        quality = float(eye_detector.get_eye_quality_score(rgb))
+        center_frac = _skin_fraction(rgb)
+        if quality < 0.35 or center_frac < 0.04:
+            return ValidationResult(
+                False,
+                quality,
+                "Eye image quality is too low. Use a clearer, close-up eye or conjunctiva photo.",
+            )
+        return ValidationResult(True, quality, "Eye image accepted.")
+
     gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
     enhanced = clahe.apply(gray)
