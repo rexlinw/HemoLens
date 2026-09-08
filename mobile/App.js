@@ -400,6 +400,38 @@ function buildRetakeNotice(validation, fallbackMessage) {
       }
 
       if (response.data.status === 'invalid_image' || response.data.status === 'no_eyes_detected') {
+        if (images.eye) {
+          try {
+            const eyeFallback = await predictEyeOnly();
+            if (eyeFallback) {
+              response = eyeFallback;
+            }
+          } catch (fallbackError) {
+            console.log('Eye fallback error:', fallbackError.message);
+          }
+        }
+
+        if (response.data.status === 'success') {
+          setResult({
+            hemoglobin: response.data.hemoglobin_estimate,
+            unit: response.data.unit || 'g/dL',
+            healthStatus: response.data.health_status,
+            healthMessage: response.data.health_message,
+            healthColor: response.data.health_color,
+            modalitiesUsed: response.data.modalities_used || (images.eye ? ['eye'] : []),
+            processingTime: response.data.processing_time_ms,
+          });
+          addHistoryEntry({
+            date: new Date().toISOString(),
+            hemoglobin: Number(response.data.hemoglobin_estimate),
+            healthStatus: response.data.health_status,
+            modalitiesUsed: response.data.modalities_used || (images.eye ? ['eye'] : []),
+            processingTime: response.data.processing_time_ms,
+          });
+          setApiStatus('connected');
+          return;
+        }
+
         const notice = buildRetakeNotice(response.data.validation, response.data.message);
         setRetakeNotice(notice);
         return;

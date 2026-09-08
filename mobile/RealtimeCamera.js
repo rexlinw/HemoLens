@@ -23,6 +23,7 @@ export default function RealtimeCamera({ onClose }) {
   const [frameCount, setFrameCount] = useState(0);
   const [connectionStatus, setConnectionStatus] = useState('ready');
   const [statusColor, setStatusColor] = useState('#6B7280');
+  const [rejectionMessage, setRejectionMessage] = useState(null);
   const captureIntervalRef = useRef(null);
 
   const [permission, requestPermission] = useCameraPermissions();
@@ -99,18 +100,19 @@ export default function RealtimeCamera({ onClose }) {
       });
 
       const response = await axios.post(`${API_BASE_URL}/predict`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-        timeout: 30000,
+        // Let React Native set the multipart boundary. A manually supplied
+        // Content-Type can omit it and make FastAPI reject the upload.
+        timeout: 120000,
       });
 
       if (response.data.status === 'no_eyes_detected' || response.data.status === 'invalid_image') {
         console.log('Image rejected:', response.data.message);
+        setRejectionMessage(response.data.message || 'Keep the lower eyelid in focus and improve the lighting.');
         return;
       }
 
       if (response.data && response.data.hemoglobin_estimate !== undefined) {
+        setRejectionMessage(null);
         const newPrediction = {
           hemoglobin: response.data.hemoglobin_estimate,
           timestamp: new Date().toLocaleTimeString(),
@@ -216,6 +218,9 @@ export default function RealtimeCamera({ onClose }) {
               <ActivityIndicator size="small" color="#FFF" />
               <Text style={styles.processingText}>Analyzing…</Text>
             </View>
+          )}
+          {rejectionMessage && (
+            <Text style={styles.rejectionText}>{rejectionMessage}</Text>
           )}
           <Text style={styles.frameCount}>{frameCount} frames</Text>
 
@@ -396,6 +401,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#FFF',
+  },
+  rejectionText: {
+    color: '#FDE68A',
+    fontSize: 12,
+    lineHeight: 17,
+    textAlign: 'center',
+    marginTop: 10,
   },
   frameCount: {
     fontSize: 11,

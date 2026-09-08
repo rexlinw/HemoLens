@@ -10,8 +10,11 @@ function resolveApiBaseUrl() {
 
 export const API_BASE_URL = resolveApiBaseUrl();
 
-const BACKEND_PROBE_TIMEOUT_MS = 4000;
-const BACKEND_PROBE_RETRY_DELAYS_MS = [0, 2000];
+// Render free services spin down when idle.  The first request can take up to a
+// minute while the container starts, so a short probe makes Expo Go report the
+// API as offline even though it is still waking up.
+const BACKEND_PROBE_TIMEOUT_MS = 70000;
+const BACKEND_PROBE_RETRY_DELAYS_MS = [0, 3000];
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
