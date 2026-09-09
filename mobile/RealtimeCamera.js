@@ -39,11 +39,11 @@ export default function RealtimeCamera({ onClose }) {
   }, []);
 
   useEffect(() => {
-    if (isCameraReady && permission?.granted && connectionStatus === 'connected') {
+    if (isCameraReady && permission?.granted) {
       captureIntervalRef.current = setInterval(captureFrame, CAPTURE_INTERVAL);
       return () => clearInterval(captureIntervalRef.current);
     }
-  }, [isCameraReady, permission, connectionStatus]);
+  }, [isCameraReady, permission]);
 
   useEffect(() => {
     if (predictions.length > 0) {
@@ -206,10 +206,22 @@ export default function RealtimeCamera({ onClose }) {
                 )}
                 <Text style={styles.resultMeta}>{predictions.length} readings</Text>
               </>
+            ) : connectionStatus === 'error' ? (
+              <>
+                <Text style={styles.resultLabel}>Offline</Text>
+                <Text style={styles.waitingText}>Could not reach the server. Tap Stop and try again after the API wakes up.</Text>
+              </>
+            ) : frameCount === 0 ? (
+              <>
+                <Text style={styles.resultLabel}>Starting camera</Text>
+                <ActivityIndicator size="large" color="#0D9488" style={{ marginVertical: 8 }} />
+              </>
             ) : (
               <>
-                <Text style={styles.resultLabel}>Initializing</Text>
-                <ActivityIndicator size="large" color="#0D9488" style={{ marginVertical: 8 }} />
+                <Text style={styles.resultLabel}>Waiting for a clear eye</Text>
+                <Text style={styles.waitingText}>
+                  {rejectionMessage || 'Keep the lower eyelid centered and hold steady in good lighting.'}
+                </Text>
               </>
             )}
           </View>
@@ -386,6 +398,14 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: 'rgba(255,255,255,0.7)',
     marginTop: 8,
+  },
+  waitingText: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.9)',
+    textAlign: 'center',
+    lineHeight: 18,
+    marginTop: 6,
+    paddingHorizontal: 8,
   },
   processingPill: {
     flexDirection: 'row',

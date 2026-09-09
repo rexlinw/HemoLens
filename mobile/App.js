@@ -149,6 +149,42 @@ export default function App() {
     checkApiHealth();
   }, []);
 
+  React.useEffect(() => {
+    let active = true;
+
+    const loadHistory = async () => {
+      try {
+        const info = await FileSystem.getInfoAsync(HISTORY_FILE);
+        if (!info.exists) {
+          if (active) {
+            setHistory([]);
+          }
+          return;
+        }
+
+        const raw = await FileSystem.readAsStringAsync(HISTORY_FILE);
+        const parsed = JSON.parse(raw);
+        if (active) {
+          setHistory(Array.isArray(parsed) ? parsed : []);
+        }
+      } catch (_) {
+        if (active) {
+          setHistory([]);
+        }
+      } finally {
+        if (active) {
+          setHistoryLoading(false);
+        }
+      }
+    };
+
+    loadHistory();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const checkApiHealth = async () => {
     try {
       const backendCheck = await probeBackend();
@@ -259,7 +295,13 @@ function getRetakeAdvice(modality, message) {
 
 function buildRetakeNotice(validation, fallbackMessage) {
   if (!validation) {
-    return null;
+    if (!fallbackMessage) {
+      return null;
+    }
+    return {
+      title: 'Retake needed',
+      items: [fallbackMessage],
+    };
   }
 
   const failed = Object.entries(validation)
@@ -432,8 +474,23 @@ function buildRetakeNotice(validation, fallbackMessage) {
           return;
         }
 
-        const notice = buildRetakeNotice(response.data.validation, response.data.message);
-        setRetakeNotice(notice);
+        setRetakeNotice(
+          buildRetakeNotice(response.data.validation, response.data.message) || {
+            title: 'Retake needed',
+            items: ['One or more images need a clearer retake.'],
+          }
+        );
+        return;
+      }
+
+      if (
+        response.data.hemoglobin_estimate == null ||
+        Number.isNaN(Number(response.data.hemoglobin_estimate))
+      ) {
+        Alert.alert(
+          'No result',
+          response.data.message || 'The server did not return a hemoglobin estimate. Try again with clearer photos.'
+        );
         return;
       }
 

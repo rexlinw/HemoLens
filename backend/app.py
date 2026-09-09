@@ -257,7 +257,11 @@ async def predict(file: UploadFile = File(...)):
             detail="Models not loaded. Please check server logs."
         )
 
-    if file.content_type.startswith("image/") is False:
+    content_type = (file.content_type or "").lower()
+    if content_type and not content_type.startswith("image/") and content_type not in {
+        "application/octet-stream",
+        "binary/octet-stream",
+    }:
         raise HTTPException(status_code=400, detail="File must be an image")
 
     start_time = time.time()
@@ -278,6 +282,13 @@ async def predict(file: UploadFile = File(...)):
                 "processing_time_ms": int((time.time() - start_time) * 1000),
                 "filename": file.filename,
                 "eye_quality_score": float(validation.score),
+                "validation": {
+                    "eye": {
+                        "valid": validation.valid,
+                        "score": float(validation.score),
+                        "message": validation.message,
+                    }
+                },
             }
 
         preprocessed = ImagePreprocessor.preprocess(
