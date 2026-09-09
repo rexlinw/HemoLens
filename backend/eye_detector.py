@@ -133,7 +133,9 @@ class EyeDetector:
         clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
         enhanced = clahe.apply(gray)
         face_box, eyes = self._best_face_and_eyes(enhanced)
-        return face_box is not None and len(eyes) >= 2
+        if face_box is not None and len(eyes) >= 2:
+            return True
+        return self._fallback_detect_eyes(image)
 
     def get_eye_quality_score(self, image: np.ndarray) -> float:
         if not self.supports_cascade or self.eye_cascade is None or self.face_cascade is None:
@@ -149,7 +151,7 @@ class EyeDetector:
 
         face_box, eyes = self._best_face_and_eyes(enhanced)
         if face_box is None or len(eyes) < 2:
-            return 0.0
+            return self._fallback_quality_score(image)
 
         face_w = float(face_box[2])
         face_h = float(face_box[3])

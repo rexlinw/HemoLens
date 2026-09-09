@@ -132,6 +132,9 @@ def validate_eye(image: np.ndarray, eye_detector: EyeDetector) -> ValidationResu
     detected = eye_detector.detect_eyes(rgb)
     quality = float(eye_detector.get_eye_quality_score(rgb))
 
+    if quality >= 0.50:
+        return ValidationResult(True, quality, "Eye image accepted.")
+
     if face_box is None or not detected:
         return ValidationResult(
             False,
