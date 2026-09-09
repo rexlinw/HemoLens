@@ -100,20 +100,83 @@ def _eyes_look_plausible(face_box, eye_boxes) -> bool:
     return True
 
 
+def _eye_structure_signals(rgb: np.ndarray) -> Tuple[float, float, float]:
+    """
+    Rough evidence that the frame actually contains an eye.
+
+    An eye / lower-eyelid capture shows at least one of:
+      * sclera      - bright, desaturated pixels (the white of the eye)
+      * iris/pupil  - a cluster of very dark pixels (also lashes)
+      * conjunctiva - vivid pink/red mucosa (large R-G and R-B gap)
+
+    A plain hand, palm or finger photo has none of these, so it can be
+    separated from a real eye even when the generic quality checks pass.
+    Returns (sclera_fraction, dark_fraction, mucosa_fraction).
+    """
+    hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)
+    s = hsv[:, :, 1].astype(np.float32)
+    v = hsv[:, :, 2].astype(np.float32)
+    gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
+
+    # white of the eye: bright AND close to desaturated (skin never is)
+    sclera_frac = float(((v > 170) & (s < 50)).mean())
+    # iris / pupil / eyelashes: near-black pixels (rare on an evenly lit palm)
+    dark_frac = float((gray < 50).mean())
+
+    r = rgb[:, :, 0].astype(np.int16)
+    g = rgb[:, :, 1].astype(np.int16)
+    b = rgb[:, :, 2].astype(np.int16)
+    # vivid pink/red mucosa (inner lid): strong red dominance, saturated,
+    # mid brightness, and present as a band rather than the whole frame
+    # (a fully red frame is just warm lighting on skin, not an eye).
+    mucosa_frac = float(
+        (((r - g) > 55) & ((r - b) > 60) & (s > 90) & (v > 90) & (v < 235)).mean()
+    )
+
+    return sclera_frac, dark_frac, mucosa_frac
+
+
+_NOT_AN_EYE_MSG = (
+    "This looks like a hand, finger or plain-skin photo, not an eye. "
+    "Capture a close-up of the eye, or pull down the lower eyelid so the "
+    "white of the eye or the pink inner lid is clearly visible."
+)
+
+
 def validate_eye(image: np.ndarray, eye_detector: EyeDetector) -> ValidationResult:
     rgb = _to_rgb(image)
     basic = _basic_image_checks(rgb)
     if basic:
         return ValidationResult(False, 0.0, basic)
 
+    # Reject non-eye skin images (e.g. a palm dropped into the eye slot) that
+    # would otherwise pass on generic sharpness/brightness alone.
+    sclera_frac, dark_frac, mucosa_frac = _eye_structure_signals(rgb)
+    has_eye_structure = (
+        # white of the eye, or dark iris/pupil/lashes - neither appears on a
+        # hand or palm. A pink-lid (conjunctiva) close-up only counts when it
+        # is paired with some dark pixels (eyelashes are always present at that
+        # range), so warm skin tones alone cannot satisfy this.
+        sclera_frac >= 0.02
+        or dark_frac >= 0.05
+        or (0.05 <= mucosa_frac <= 0.75 and dark_frac >= 0.02)
+    )
+    if _skin_fraction(rgb) > 0.30 and not has_eye_structure:
+        return ValidationResult(
+            False,
+            round(max(sclera_frac, dark_frac, mucosa_frac), 3),
+            _NOT_AN_EYE_MSG,
+        )
+
     if not getattr(eye_detector, "supports_cascade", False):
         quality = float(eye_detector.get_eye_quality_score(rgb))
         center_frac = _skin_fraction(rgb)
-        if quality < 0.35 or center_frac < 0.04:
+        if not has_eye_structure or quality < 0.35 or center_frac < 0.04:
             return ValidationResult(
                 False,
                 quality,
-                "Eye image quality is too low. Use a clearer, close-up eye or conjunctiva photo.",
+                "Eye image quality is too low or no eye is visible. "
+                "Use a clearer, close-up eye or conjunctiva photo.",
             )
         return ValidationResult(True, quality, "Eye image accepted.")
 
@@ -132,7 +195,9 @@ def validate_eye(image: np.ndarray, eye_detector: EyeDetector) -> ValidationResu
     detected = eye_detector.detect_eyes(rgb)
     quality = float(eye_detector.get_eye_quality_score(rgb))
 
-    if quality >= 0.50:
+    # Fast-accept only when the frame both scores well AND shows eye structure
+    # (sclera / iris / conjunctiva). Quality alone let hand photos through.
+    if quality >= 0.50 and has_eye_structure:
         return ValidationResult(True, quality, "Eye image accepted.")
 
     if face_box is None or not detected:
