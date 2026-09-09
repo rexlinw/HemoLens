@@ -1,12 +1,22 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from typing import Optional
 import numpy as np
 import pickle
 import io
+import sys
 import time
 from PIL import Image
 from pathlib import Path
+
+# Windows consoles default to cp1252 and crash on the ✓/⚠ characters in the
+# startup logs below. Force UTF-8 so `python app.py` / uvicorn start cleanly.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
 
 import cv2
 from preprocessing import ImagePreprocessor
@@ -147,7 +157,16 @@ async def root():
             "POST /predict/batch": "Batch eye predictions",
         },
         "multimodal_available": multimodal_loaded,
+        "dashboard": "/dashboard",
     }
+
+
+@app.get("/dashboard", include_in_schema=False)
+async def dashboard_page():
+    dashboard_file = Path(__file__).parent.parent / "dashboard.html"
+    if not dashboard_file.exists():
+        raise HTTPException(status_code=404, detail="dashboard.html not found at repo root")
+    return FileResponse(dashboard_file, media_type="text/html")
 
 
 @app.get("/health")
