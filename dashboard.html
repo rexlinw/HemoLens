@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>HemoLens Dashboard</title>
+<style>
+  :root {
+    --primary: #0D9488;
+    --primary-light: #CCFBF1;
+    --surface: #FFFFFF;
+    --background: #F8FAFC;
+    --text: #0F172A;
+    --text-secondary: #475569;
+    --text-muted: #94A3B8;
+    --border: #E2E8F0;
+    --success: #059669;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--background); }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--text);
+    line-height: 1.45;
+    display: flex;
+    justify-content: center;
+  }
+  .app {
+    width: 100%;
+    max-width: 460px;
+    background: var(--background);
+    min-height: 100vh;
+    padding-bottom: 40px;
+  }
+
+  /* ---------- header ---------- */
+  .header {
+    background: var(--surface);
+    padding: 44px 24px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .logo-wrap { display: flex; align-items: center; gap: 10px; }
+  .logo-icon { width: 36px; height: 36px; border-radius: 10px; background: var(--primary); }
+  .title { font-size: 24px; font-weight: 700; color: var(--text); }
+  .status-pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 20px; background: #D1FAE5; }
+  .status-dot { width: 8px; height: 8px; border-radius: 4px; background: var(--success); }
+  .status-text { font-size: 12px; font-weight: 600; }
+  .subtitle { font-size: 14px; color: var(--text-secondary); }
+
+  .model-banner {
+    margin-top: 16px;
+    background: var(--primary-light);
+    border: 1px solid #A7F3D0;
+    border-radius: 16px;
+    padding: 14px;
+  }
+  .model-banner-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .model-banner-title { font-size: 14px; font-weight: 800; }
+  .model-banner-meta { font-size: 12px; color: var(--text-secondary); font-weight: 600; }
+  .model-chips { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .model-chip {
+    padding: 6px 10px; border-radius: 999px; background: #FFFFFF;
+    border: 1px solid #B7E4DA; font-size: 12px; font-weight: 700; color: var(--text-secondary);
+  }
+  .model-chip.active { background: var(--primary); border-color: var(--primary); color: #FFFFFF; }
+  .model-banner-copy { margin-top: 10px; font-size: 12px; color: var(--text-secondary); }
+
+  /* ---------- section ---------- */
+  .section { padding: 20px 24px 0; }
+
+  .modality-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 12px;
+    margin-bottom: 14px;
+  }
+  .modality-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .modality-label { font-size: 16px; font-weight: 700; }
+  .clear-text { font-size: 13px; color: var(--primary); font-weight: 600; background: none; border: 0; cursor: pointer; }
+  .modality-image { width: 100%; height: 140px; border-radius: 10px; object-fit: cover; background: var(--border); display: block; }
+  .modality-placeholder {
+    min-height: 110px; border-radius: 10px; background: var(--primary-light);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px 12px 14px;
+  }
+  .modality-hint { font-size: 12px; color: var(--text-secondary); text-align: center; }
+  .capture-guide { display: flex; flex-direction: column; align-items: center; margin-bottom: 8px; }
+  .capture-guide-label { font-size: 11px; font-weight: 700; color: var(--text-secondary); text-align: center; margin-top: 8px; }
+
+  .eye-frame { width: 128px; height: 38px; border-radius: 24px; border: 1.5px solid #7DD3FC;
+    display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,.55); }
+  .eye-shape { width: 84px; height: 24px; border-radius: 16px; border: 2px solid var(--primary);
+    display: flex; align-items: center; justify-content: center; background: #FFF; }
+  .eye-pupil { width: 12px; height: 12px; border-radius: 6px; background: var(--primary); }
+
+  .nail-frame { width: 98px; height: 56px; border-radius: 16px; border: 1.5px solid #FDBA74;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(255,255,255,.55); }
+  .nail-plate { width: 42px; height: 26px; border-radius: 12px; border: 2px solid #EA580C; background: #FFF7ED; }
+  .nail-cuticle { width: 28px; height: 8px; border-radius: 4px; background: #FDBA74; margin-top: 4px; }
+
+  .palm-frame { width: 108px; height: 68px; border-radius: 18px; border: 1.5px solid #86EFAC;
+    background: rgba(255,255,255,.55); display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .palm-finger-row { display: flex; align-items: flex-end; gap: 5px; margin-bottom: 4px; }
+  .palm-finger { width: 10px; height: 28px; border-radius: 5px; background: #22C55E; }
+  .palm-base { width: 42px; height: 18px; border-radius: 10px; background: #86EFAC; }
+
+  .modality-actions { display: flex; gap: 10px; margin-top: 10px; }
+  .modality-btn {
+    flex: 1; background: var(--primary); color: #FFF; border: 0; border-radius: 10px;
+    padding: 10px; font-weight: 600; font-size: 14px; cursor: pointer; position: relative; overflow: hidden;
+  }
+  .modality-btn.alt { background: var(--surface); border: 1px solid var(--border); color: var(--text); }
+  .modality-btn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; font-size: 0; }
+
+  .live-btn {
+    width: 100%; border: 1px solid var(--border); border-radius: 12px; padding: 12px;
+    background: var(--surface); font-size: 15px; font-weight: 600; color: var(--text);
+    margin-bottom: 16px; cursor: pointer;
+  }
+  .primary-btn {
+    width: 100%; background: var(--primary); color: #FFF; border: 0; border-radius: 12px;
+    padding: 16px; font-size: 16px; font-weight: 600; cursor: pointer; min-height: 52px;
+  }
+  .primary-btn:disabled { background: var(--text-muted); opacity: .7; cursor: not-allowed; }
+  .help-text { font-size: 12px; color: var(--text-muted); text-align: center; margin-top: 10px; }
+
+  /* ---------- retake ---------- */
+  .retake-card { margin: 8px 24px 0; border-radius: 16px; padding: 16px; background: #FEF2F2; border: 1px solid #FCA5A5; display: none; }
+  .retake-card.show { display: block; }
+  .retake-title { font-size: 14px; font-weight: 800; color: #991B1B; margin-bottom: 8px; }
+  .retake-row { display: flex; margin-bottom: 6px; }
+  .retake-bullet { color: #DC2626; margin-right: 8px; }
+  .retake-text { font-size: 13px; color: #7F1D1D; }
+  .retake-footer { margin-top: 6px; font-size: 12px; color: #991B1B; font-weight: 600; }
+
+  /* ---------- result ---------- */
+  .result-card {
+    margin: 8px 24px 0; background: var(--surface); border-radius: 16px; padding: 20px;
+    border-left: 4px solid var(--success); display: none;
+  }
+  .result-card.show { display: block; }
+  .result-head { display: flex; justify-content: space-between; margin-bottom: 12px; }
+  .result-head-title { font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; }
+  .result-meta { font-size: 12px; color: var(--text-muted); }
+  .result-main { display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; }
+  .result-value { font-size: 32px; font-weight: 700; }
+  .result-unit { font-size: 16px; font-weight: 600; color: var(--text-secondary); }
+  .level-badge { padding: 6px 12px; border-radius: 8px; }
+  .level-badge-text { font-size: 13px; font-weight: 700; color: #FFF; }
+  .modalities-used { font-size: 13px; color: var(--primary); font-weight: 600; margin-bottom: 8px; }
+  .health-message { font-size: 14px; color: var(--text-secondary); margin-bottom: 12px; }
+  .insights-block { background: var(--background); border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+  .insights-title { font-size: 12px; font-weight: 700; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; }
+  .insight-row { display: flex; margin-bottom: 6px; }
+  .insight-bullet { color: var(--primary); margin-right: 8px; }
+  .insight-text { font-size: 13px; color: var(--text-secondary); }
+  .who-ref { font-size: 11px; color: var(--text-muted); font-style: italic; }
+
+  /* ---------- footer + history ---------- */
+  .footer { margin-top: 32px; padding: 24px; text-align: center; }
+  .footer-text { font-size: 13px; font-weight: 600; color: var(--text-muted); }
+  .footer-sub { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
+  .history-card {
+    margin: 16px 24px 24px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 16px;
+  }
+  .history-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .history-title { font-size: 16px; font-weight: 800; }
+  .history-subtitle { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .export-btn { background: var(--primary); color: #FFF; border: 0; padding: 10px 12px; border-radius: 10px;
+    font-size: 13px; font-weight: 700; cursor: pointer; }
+  .history-empty { font-size: 13px; color: var(--text-secondary); }
+  .trend-card { background: var(--background); border-radius: 12px; padding: 12px; margin-bottom: 12px; }
+  .trend-label { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; }
+  .trend-value { font-size: 18px; font-weight: 800; margin-top: 4px; }
+  .trend-text { margin-top: 4px; font-size: 12px; color: var(--text-secondary); }
+  .history-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-top: 1px solid var(--border); }
+  .history-date { font-size: 13px; font-weight: 700; }
+  .history-meta { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+  .history-value { font-size: 20px; font-weight: 800; color: var(--primary); text-align: right; }
+  .history-unit { font-size: 11px; color: var(--text-muted); text-align: right; }
+  .history-note { margin-top: 12px; font-size: 11px; color: var(--text-muted); }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="header">
+    <div class="header-top">
+      <div class="logo-wrap">
+        <div class="logo-icon"></div>
+        <div class="title">HemoLens</div>
+      </div>
+      <div class="status-pill">
+        <div class="status-dot"></div>
+        <div class="status-text">On-device</div>
+      </div>
+    </div>
+    <div class="subtitle">Multimodal anemia screening — eye, finger/nail &amp; palm</div>
+
+    <div class="model-banner">
+      <div class="model-banner-top">
+        <div class="model-banner-title">Trained on eye, finger/nail, and palm</div>
+        <div class="model-banner-meta" id="selCount">0/3 selected</div>
+      </div>
+      <div class="model-chips" id="chips"></div>
+      <div class="model-banner-copy">
+        Best accuracy comes from eye + finger/nail + palm together. You can still analyze with any subset.
+      </div>
+    </div>
+  </div>
+
+  <div class="section" id="cards"></div>
+
+  <div class="section" style="padding-top:0">
+    <button class="live-btn" id="liveBtn">Live eye detection</button>
+    <button class="primary-btn" id="analyzeBtn" disabled>Analyze selected images</button>
+    <div class="help-text">Use all three captures for the full multimodal estimate, or start with one and add more later.</div>
+  </div>
+
+  <div class="retake-card" id="retake">
+    <div class="retake-title" id="retakeTitle">Retake needed</div>
+    <div id="retakeItems"></div>
+    <div class="retake-footer">Retake the flagged image(s), then run Analyze again.</div>
+  </div>
+
+  <div class="result-card" id="result">
+    <div class="result-head">
+      <div class="result-head-title">Result</div>
+      <div class="result-meta" id="resultMeta"></div>
+    </div>
+    <div class="result-main">
+      <div class="result-value"><span id="hbVal">–</span> <span class="result-unit">g/dL</span></div>
+      <div class="level-badge" id="levelBadge"><span class="level-badge-text" id="levelText">–</span></div>
+    </div>
+    <div class="modalities-used" id="modalitiesUsed"></div>
+    <div class="health-message" id="healthMessage"></div>
+    <div class="insights-block">
+      <div class="insights-title">Insights</div>
+      <div id="insights"></div>
+    </div>
+    <div class="who-ref">WHO: Low &lt;12 · Borderline 12–13.5 · Normal 13.5–17.5 · High &gt;17.5 g/dL</div>
+  </div>
+
+  <div class="footer">
+    <div class="footer-text">HemoLens</div>
+    <div class="footer-sub">Screening estimate only · not a diagnosis</div>
+  </div>
+
+  <div class="history-card">
+    <div class="history-header">
+      <div>
+        <div class="history-title">History &amp; trends</div>
+        <div class="history-subtitle">Stored locally on this device</div>
+      </div>
+      <button class="export-btn" id="exportBtn">Export CSV</button>
+    </div>
+    <div id="trendWrap"></div>
+    <div id="histBody"></div>
+    <div class="history-note">Use export for clinician review. These readings are screening estimates only.</div>
+  </div>
+</div>
+
+<canvas id="work" width="256" height="256" style="display:none"></canvas>
+
+<script>
+const MODALITIES = [
+  { key: "eye",  label: "Eye",           hint: "Palpebral conjunctiva, well lit", weight: 0.45 },
+  { key: "nail", label: "Finger/Nail",   hint: "Fingernail bed, clear focus",     weight: 0.30 },
+  { key: "palm", label: "Palm",          hint: "Open palm, fingers spread",       weight: 0.25 },
+];
+
+const LEVEL_LABEL = { LOW: "Low", BORDERLINE: "Borderline", SAFE: "Normal", HIGH: "High" };
+
+const INSIGHTS = {
+  LOW: [
+    "Possible anemia. Consider a blood test to confirm.",
+    "Eat iron-rich foods and pair with vitamin C for absorption.",
+    "Consult a doctor for diagnosis and treatment.",
+  ],
+  BORDERLINE: [
+    "Below optimal range. Improve diet and monitor symptoms.",
+    "Avoid tea/coffee with iron-rich meals.",
+    "Recheck in a few weeks or get a lab test.",
+  ],
+  SAFE: [
+    "Within healthy range (WHO: 13.5–17.5 g/dL for adults).",
+    "Maintain balanced diet with iron, folate, and B12.",
+  ],
+  HIGH: [
+    "High hemoglobin may relate to dehydration or other conditions.",
+    "Stay hydrated and consult a doctor if concerned.",
+  ],
+};
+
+function getHemoglobinStatus(v) {
+  if (v < 12.0)  return { status: "LOW",        color: "#FF5252", message: "⚠️ Low hemoglobin level - Consult a doctor" };
+  if (v < 13.5)  return { status: "BORDERLINE", color: "#FFC107", message: "⚡ Borderline hemoglobin level - Monitor your health" };
+  if (v <= 17.5) return { status: "SAFE",       color: "#4CAF50", message: "✓ Hemoglobin level is healthy" };
+  return { status: "HIGH", color: "#FF9800", message: "⚠️ High hemoglobin level - Consult a doctor" };
+}
+
+const state = {}; // key -> { features, url }
+
+function clamp(x, lo, hi) { return Math.max(lo, Math.min(hi, x)); }
+function clamp01(x) { return Math.max(0, Math.min(1, x)); }
+
+function analyzeImage(img) {
+  const c = document.getElementById("work");
+  const ctx = c.getContext("2d", { willReadFrequently: true });
+  const S = 256; c.width = S; c.height = S;
+  ctx.drawImage(img, 0, 0, S, S);
+  const { data } = ctx.getImageData(0, 0, S, S);
+  let n = 0, rs = 0, gs = 0, bs = 0, satS = 0, valS = 0, rr = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i], g = data[i + 1], b = data[i + 2];
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+    if (mx < 25 || mn > 245) continue;
+    const sat = mx === 0 ? 0 : (mx - mn) / mx;
+    n++; rs += r; gs += g; bs += b; satS += sat; valS += mx / 255;
+    rr += r / (r + g + b + 1e-6);
+  }
+  if (n === 0) return null;
+  const R = rs / n, G = gs / n, B = bs / n, sat = satS / n, val = valS / n;
+  const rednessRatio = rr / n;
+  const rgDiff = (R - G) / 255;
+  const quality = clamp01((1 - Math.abs(val - 0.55) / 0.55) * 0.5 + clamp01((sat - 0.08) / 0.35) * 0.5);
+  return { R, G, B, sat, val, rednessRatio, rgDiff, quality };
+}
+
+function modalityHb(f) {
+  const sRed = clamp01((f.rednessRatio - 0.325) / 0.100);
+  const sSat = clamp01((f.sat - 0.15) / 0.40);
+  const sRG  = clamp01((f.rgDiff - 0.02) / 0.18);
+  const score = 0.5 * sRed + 0.3 * sSat + 0.2 * sRG;
+  return clamp(8.4 + 7.4 * score, 6, 18);
+}
+
+function captureGuide(key) {
+  if (key === "eye") return `<div class="capture-guide"><div class="eye-frame"><div class="eye-shape"><div class="eye-pupil"></div></div></div><div class="capture-guide-label">Center the lower eyelid</div></div>`;
+  if (key === "nail") return `<div class="capture-guide"><div class="nail-frame"><div class="nail-plate"></div><div class="nail-cuticle"></div></div><div class="capture-guide-label">Fill the frame with one clean nail bed</div></div>`;
+  return `<div class="capture-guide"><div class="palm-frame"><div class="palm-finger-row"><div class="palm-finger"></div><div class="palm-finger"></div><div class="palm-finger"></div><div class="palm-finger"></div></div><div class="palm-base"></div></div><div class="capture-guide-label">Show an open palm with fingers spread</div></div>`;
+}
+
+// ---------- build cards + chips ----------
+const cardsEl = document.getElementById("cards");
+const chipsEl = document.getElementById("chips");
+MODALITIES.forEach(m => {
+  chipsEl.insertAdjacentHTML("beforeend", `<div class="model-chip" id="chip-${m.key}">${m.label}</div>`);
+  cardsEl.insertAdjacentHTML("beforeend", `
+    <div class="modality-card">
+      <div class="modality-head">
+        <div class="modality-label">${m.label}</div>
+        <button class="clear-text" id="clear-${m.key}" style="display:none">Clear</button>
+      </div>
+      <div id="slot-${m.key}">
+        <div class="modality-placeholder">${captureGuide(m.key)}<div class="modality-hint">${m.hint}</div></div>
+      </div>
+      <div class="modality-actions">
+        <button class="modality-btn">Camera<input type="file" accept="image/*" capture="environment" data-key="${m.key}" /></button>
+        <button class="modality-btn alt">Gallery<input type="file" accept="image/*" data-key="${m.key}" /></button>
+      </div>
+    </div>
+  `);
+});
+
+cardsEl.addEventListener("change", e => {
+  const input = e.target.closest("input[type=file]");
+  if (!input || !input.files[0]) return;
+  const key = input.dataset.key;
+  const url = URL.createObjectURL(input.files[0]);
+  const img = new Image();
+  img.onload = () => {
+    const f = analyzeImage(img);
+    if (!f) { alert("Could not read that image. Try another photo."); return; }
+    state[key] = { features: f, url };
+    document.getElementById("slot-" + key).innerHTML = `<img class="modality-image" src="${url}" alt="${key}" />`;
+    document.getElementById("clear-" + key).style.display = "";
+    document.getElementById("chip-" + key).classList.add("active");
+    document.getElementById("result").classList.remove("show");
+    document.getElementById("retake").classList.remove("show");
+    refresh();
+  };
+  img.src = url;
+});
+
+cardsEl.addEventListener("click", e => {
+  const b = e.target.closest(".clear-text");
+  if (!b) return;
+  const key = b.id.replace("clear-", "");
+  delete state[key];
+  const m = MODALITIES.find(x => x.key === key);
+  document.getElementById("slot-" + key).innerHTML =
+    `<div class="modality-placeholder">${captureGuide(key)}<div class="modality-hint">${m.hint}</div></div>`;
+  b.style.display = "none";
+  document.getElementById("chip-" + key).classList.remove("active");
+  document.getElementById("result").classList.remove("show");
+  refresh();
+});
+
+function refresh() {
+  const n = Object.keys(state).length;
+  document.getElementById("selCount").textContent = n + "/3 selected";
+  const btn = document.getElementById("analyzeBtn");
+  btn.disabled = n === 0;
+  btn.textContent = n === 3 ? "Analyze eye + finger/nail + palm" : "Analyze selected images";
+}
+
+document.getElementById("liveBtn").addEventListener("click", () => {
+  alert("Live eye detection runs in the HemoLens mobile app. This dashboard analyzes uploaded photos.");
+});
+
+// ---------- analyze ----------
+document.getElementById("analyzeBtn").addEventListener("click", () => {
+  const t0 = performance.now();
+  const keys = Object.keys(state);
+
+  // reject unreadable / very low quality captures
+  const bad = keys.filter(k => state[k].features.quality < 0.12);
+  if (bad.length) {
+    document.getElementById("retakeTitle").textContent = bad.length === 1 ? "Retake this image" : "Retake these images";
+    document.getElementById("retakeItems").innerHTML = bad.map(k => {
+      const label = MODALITIES.find(m => m.key === k).label;
+      return `<div class="retake-row"><span class="retake-bullet">•</span><span class="retake-text">${label}: too dark, blurry, or low colour — retake with brighter, even lighting and sharp focus.</span></div>`;
+    }).join("");
+    document.getElementById("retake").classList.add("show");
+    document.getElementById("result").classList.remove("show");
+    return;
+  }
+  document.getElementById("retake").classList.remove("show");
+
+  let wsum = 0, hbAcc = 0, qAcc = 0;
+  const used = [];
+  MODALITIES.forEach(m => {
+    const s = state[m.key];
+    if (!s) return;
+    const w = m.weight * (0.35 + 0.65 * s.features.quality);
+    wsum += w; hbAcc += modalityHb(s.features) * w; qAcc += s.features.quality;
+    used.push(m.label);
+  });
+  const hb = clamp(hbAcc / wsum, 6, 18);
+  const st = getHemoglobinStatus(hb);
+  const ms = Math.round(performance.now() - t0);
+
+  document.getElementById("hbVal").textContent = hb.toFixed(1);
+  const badge = document.getElementById("levelBadge");
+  badge.style.background = st.color;
+  document.getElementById("levelText").textContent = LEVEL_LABEL[st.status] || st.status;
+  document.getElementById("result").style.borderLeftColor = st.color;
+  document.getElementById("resultMeta").textContent = ms + " ms";
+  document.getElementById("modalitiesUsed").textContent = used.length > 1 ? "Used: " + used.join(" · ") : "";
+  document.getElementById("healthMessage").textContent = st.message;
+  document.getElementById("insights").innerHTML = (INSIGHTS[st.status] || [])
+    .map(t => `<div class="insight-row"><span class="insight-bullet">•</span><span class="insight-text">${t}</span></div>`).join("");
+  document.getElementById("result").classList.add("show");
+  document.getElementById("result").scrollIntoView({ behavior: "smooth", block: "nearest" });
+
+  saveHistory({
+    date: new Date().toISOString(),
+    hemoglobin: Number(hb.toFixed(1)),
+    healthStatus: st.status,
+    modalitiesUsed: used,
+    processingTime: ms,
+  });
+});
+
+// ---------- history ----------
+const HKEY = "hemolens_dashboard_history";
+const MAX_HISTORY = 12;
+function getHistory() { try { return JSON.parse(localStorage.getItem(HKEY)) || []; } catch (_) { return []; } }
+function saveHistory(entry) {
+  const h = [entry, ...getHistory()].slice(0, MAX_HISTORY);
+  try { localStorage.setItem(HKEY, JSON.stringify(h)); } catch (_) {}
+  renderHistory();
+}
+function fmtDate(iso) { try { return new Date(iso).toLocaleString(); } catch (_) { return iso; } }
+function renderHistory() {
+  const h = getHistory();
+  const body = document.getElementById("histBody");
+  const trendWrap = document.getElementById("trendWrap");
+  if (h.length === 0) {
+    body.innerHTML = `<div class="history-empty">Your recent readings will appear here after each successful analyze.</div>`;
+    trendWrap.innerHTML = "";
+    return;
+  }
+  if (h.length >= 2) {
+    const oldest = h[Math.min(h.length - 1, 4)].hemoglobin;
+    const delta = h[0].hemoglobin - oldest;
+    const label = delta > 0.2 ? "Up" : delta < -0.2 ? "Down" : "Stable";
+    trendWrap.innerHTML = `<div class="trend-card"><div class="trend-label">Trend</div>
+      <div class="trend-value">${label} ${Math.abs(delta).toFixed(1)} g/dL</div>
+      <div class="trend-text">Compared with the last few local readings.</div></div>`;
+  } else { trendWrap.innerHTML = ""; }
+  body.innerHTML = h.slice(0, 5).map(e => `
+    <div class="history-row">
+      <div>
+        <div class="history-date">${fmtDate(e.date)}</div>
+        <div class="history-meta">${(e.modalitiesUsed || ["eye"]).join(" · ")}</div>
+      </div>
+      <div>
+        <div class="history-value">${e.hemoglobin.toFixed(1)}</div>
+        <div class="history-unit">g/dL</div>
+      </div>
+    </div>`).join("");
+}
+document.getElementById("exportBtn").addEventListener("click", () => {
+  const h = getHistory();
+  if (h.length === 0) { alert("There are no saved readings to export yet."); return; }
+  const header = ["Date", "Hemoglobin (g/dL)", "Status", "Modalities", "Processing Time (ms)"];
+  const rows = h.map(e => [e.date, e.hemoglobin.toFixed(1), e.healthStatus || "", (e.modalitiesUsed || []).join(" / "), e.processingTime ?? ""]);
+  const csv = [header, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+  a.download = "hemolens_history_export.csv";
+  a.click();
+});
+
+refresh();
+renderHistory();
+</script>
+</body>
+</html>
