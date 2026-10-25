@@ -142,17 +142,22 @@ class FeatureExtractor:
         return features
 
     @staticmethod
-    def extract_all_features(image: np.ndarray) -> Dict[str, float]:
+    def extract_all_features(image: np.ndarray, mask: Optional[np.ndarray] = None) -> Dict[str, float]:
+        target = image
+        if mask is not None and len(image.shape) >= 2 and mask.shape[:2] == image.shape[:2]:
+            if np.count_nonzero(mask) > 10:
+                target = cv2.bitwise_and(image, image, mask=mask)
+
         features = {}
 
-        features.update(FeatureExtractor.extract_rgb_features(image))
-        features.update(FeatureExtractor.extract_lab_features(image))
-        features.update(FeatureExtractor.extract_hsv_features(image))
-        features.update(FeatureExtractor.extract_ycrcb_features(image))
-        features.update(FeatureExtractor.extract_statistical_features(image))
-        features.update(FeatureExtractor.extract_edge_features(image))
-        features.update(FeatureExtractor.extract_contrast_features(image))
-        features.update(FeatureExtractor.extract_histogram_features(image))
+        features.update(FeatureExtractor.extract_rgb_features(target))
+        features.update(FeatureExtractor.extract_lab_features(target))
+        features.update(FeatureExtractor.extract_hsv_features(target))
+        features.update(FeatureExtractor.extract_ycrcb_features(target))
+        features.update(FeatureExtractor.extract_statistical_features(target))
+        features.update(FeatureExtractor.extract_edge_features(target))
+        features.update(FeatureExtractor.extract_contrast_features(target))
+        features.update(FeatureExtractor.extract_histogram_features(target))
 
         return features
 

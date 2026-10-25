@@ -1,22 +1,13 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
 import numpy as np
 import pickle
 import io
-import sys
 import time
 from PIL import Image
 from pathlib import Path
-
-# Windows consoles default to cp1252 and crash on the ✓/⚠ characters in the
-# startup logs below. Force UTF-8 so `python app.py` / uvicorn start cleanly.
-for _stream in (sys.stdout, sys.stderr):
-    try:
-        _stream.reconfigure(encoding="utf-8")
-    except Exception:
-        pass
 
 import cv2
 from preprocessing import ImagePreprocessor
@@ -24,6 +15,7 @@ from feature_extraction import FeatureExtractor
 from eye_detector import EyeDetector, get_hemoglobin_status
 from multimodal import load_multimodal_artifacts, predict_multimodal
 from image_validator import validate_eye, validate_multimodal_inputs
+from uncertainty import compute_signal_quality_index, estimate_confidence_interval
 
 app = FastAPI(
     title="HemoLens API v3.0",
@@ -157,16 +149,62 @@ async def root():
             "POST /predict/batch": "Batch eye predictions",
         },
         "multimodal_available": multimodal_loaded,
-        "dashboard": "/dashboard",
     }
 
 
-@app.get("/dashboard", include_in_schema=False)
-async def dashboard_page():
-    dashboard_file = Path(__file__).parent.parent / "dashboard.html"
-    if not dashboard_file.exists():
-        raise HTTPException(status_code=404, detail="dashboard.html not found at repo root")
-    return FileResponse(dashboard_file, media_type="text/html")
+@app.get("/dashboard")
+async def dashboard():
+    dashboard_path = Path(__file__).resolve().parent.parent / "dashboard.html"
+    if dashboard_path.exists():
+        return FileResponse(dashboard_path)
+    raise HTTPException(status_code=404, detail="Dashboard not found")
+
+
+@app.get("/api/network-info")
+async def get_network_info():
+    import socket, subprocess
+    local_ip = "127.0.0.1"
+    for iface in ("en0", "en1", "wlan0", "eth0"):
+        try:
+            out = subprocess.check_output(["ipconfig", "getifaddr", iface], text=True).strip()
+            if out:
+                local_ip = out
+                break
+        except Exception:
+            pass
+    if local_ip == "127.0.0.1":
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            local_ip = s.getsockname()[0]
+            s.close()
+        except Exception:
+            pass
+    # Check if a live localhost.run or pinggy tunnel is running
+    tunnel_url = None
+    try:
+        import glob
+        for log_f in glob.glob("/Users/DELL/.gemini/antigravity/brain/*/.system_generated/tasks/task-*.log"):
+            try:
+                with open(log_f, "r") as lf:
+                    txt = lf.read()
+                    if ".lhr.life" in txt:
+                        import re
+                        m = re.search(r"https://[a-zA-Z0-9]+\.lhr\.life", txt)
+                        if m:
+                            tunnel_url = m.group(0) + "/dashboard"
+                            break
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    return {
+        "local_ip": local_ip,
+        "port": 8000,
+        "dashboard_url": f"http://{local_ip}:8000/dashboard",
+        "tunnel_url": tunnel_url or "https://0ba8caf0d9c902.lhr.life/dashboard",
+    }
 
 
 @app.get("/health")
@@ -232,7 +270,10 @@ async def validate_multimodal_endpoint(
     nail_file: Optional[UploadFile] = File(None),
     palm_file: Optional[UploadFile] = File(None),
 ):
-    if not any([eye_file, nail_file, palm_file]):
+    def _is_uploaded(f) -> bool:
+        return f is not None and hasattr(f, "filename") and bool(f.filename)
+
+    if not any(_is_uploaded(f) for f in [eye_file, nail_file, palm_file]):
         raise HTTPException(
             status_code=400,
             detail="Provide at least one image: eye_file, nail_file, or palm_file",
@@ -240,11 +281,11 @@ async def validate_multimodal_endpoint(
 
     eye_array = nail_array = palm_array = None
     try:
-        if eye_file and eye_file.filename:
+        if _is_uploaded(eye_file):
             eye_array = decode_image_bytes(await eye_file.read())
-        if nail_file and nail_file.filename:
+        if _is_uploaded(nail_file):
             nail_array = decode_image_bytes(await nail_file.read())
-        if palm_file and palm_file.filename:
+        if _is_uploaded(palm_file):
             palm_array = decode_image_bytes(await palm_file.read())
 
         validation_results, accepted, error_msg = validate_multimodal_inputs(
@@ -252,7 +293,7 @@ async def validate_multimodal_endpoint(
         )
 
         return {
-            "status": "valid" if accepted else "invalid_image",
+            "status": "valid" if (accepted and not error_msg) else "invalid_image",
             "accepted": accepted,
             "message": error_msg,
             "validation": {
@@ -332,11 +373,18 @@ async def predict(file: UploadFile = File(...)):
 
         health_status = get_hemoglobin_status(hemoglobin_estimate)
 
-        processing_time_ms = int((time.time() - start_time) * 1000)
+        sqi = compute_signal_quality_index(image_array, modality="eye")
+        confidence_interval = estimate_confidence_interval(
+            float(hemoglobin_estimate),
+            sqi_score=sqi["score"],
+            modalities_count=1,
+        )
 
         return {
             "status": "success",
             "hemoglobin_estimate": float(hemoglobin_estimate),
+            "confidence_interval": confidence_interval,
+            "signal_quality_index": sqi,
             "eye_quality_score": float(validation.score),
             "unit": "g/dL",
             "health_status": health_status["status"],
@@ -366,7 +414,10 @@ async def predict_multimodal_endpoint(
             detail="Multimodal model not loaded. Run: python train.py",
         )
 
-    if not any([eye_file, nail_file, palm_file]):
+    def _is_uploaded(f) -> bool:
+        return f is not None and hasattr(f, "filename") and bool(f.filename)
+
+    if not any(_is_uploaded(f) for f in [eye_file, nail_file, palm_file]):
         raise HTTPException(
             status_code=400,
             detail="Provide at least one image: eye_file, nail_file, or palm_file",
@@ -377,15 +428,15 @@ async def predict_multimodal_endpoint(
     eye_quality = None
 
     try:
-        if eye_file and eye_file.filename:
+        if _is_uploaded(eye_file):
             contents = await eye_file.read()
             eye_array = decode_image_bytes(contents)
 
-        if nail_file and nail_file.filename:
+        if _is_uploaded(nail_file):
             contents = await nail_file.read()
             nail_array = decode_image_bytes(contents)
 
-        if palm_file and palm_file.filename:
+        if _is_uploaded(palm_file):
             contents = await palm_file.read()
             palm_array = decode_image_bytes(contents)
 
@@ -393,10 +444,10 @@ async def predict_multimodal_endpoint(
             eye_detector, eye=eye_array, nail=nail_array, palm=palm_array
         )
 
-        if not accepted:
+        if not accepted or error_msg:
             return {
                 "status": "invalid_image",
-                "message": error_msg,
+                "message": error_msg or "Validation failed.",
                 "hemoglobin_estimate": None,
                 "health_status": None,
                 "processing_time_ms": int((time.time() - start_time) * 1000),
@@ -409,6 +460,14 @@ async def predict_multimodal_endpoint(
         if "eye" in accepted and eye_array is not None:
             eye_quality = float(validation_results["eye"].score)
 
+        sqi_scores = {}
+        if eye_array is not None and "eye" in accepted:
+            sqi_scores["eye"] = compute_signal_quality_index(eye_array, modality="eye")["score"]
+        if nail_array is not None and "nail" in accepted:
+            sqi_scores["nail"] = compute_signal_quality_index(nail_array, modality="nail")["score"]
+        if palm_array is not None and "palm" in accepted:
+            sqi_scores["palm"] = compute_signal_quality_index(palm_array, modality="palm")["score"]
+
         prediction = predict_multimodal(
             multimodal_model,
             multimodal_scaler,
@@ -416,19 +475,34 @@ async def predict_multimodal_endpoint(
             nail=nail_array,
             palm=palm_array,
             modalities_filter=accepted,
+            sqi_scores=sqi_scores,
         )
 
         hemoglobin_estimate = prediction["hemoglobin_estimate"]
         health_status = get_hemoglobin_status(hemoglobin_estimate)
 
+        primary_img = eye_array if eye_array is not None else (nail_array if nail_array is not None else palm_array)
+        sqi = compute_signal_quality_index(primary_img, modality="eye" if eye_array is not None else "nail")
+        confidence_interval = estimate_confidence_interval(
+            hemoglobin_estimate,
+            sqi_score=sqi["score"],
+            modalities_count=len(prediction["modalities_used"]),
+        )
+
         return {
             "status": "success",
             "hemoglobin_estimate": hemoglobin_estimate,
+            "confidence_interval": confidence_interval,
+            "signal_quality_index": sqi,
             "unit": "g/dL",
             "health_status": health_status["status"],
             "health_message": health_status["message"],
             "health_color": health_status["color"],
             "modalities_used": prediction["modalities_used"],
+            "modality_weights": prediction["modality_weights"],
+            "modality_estimates": prediction["modality_estimates"],
+            "modality_contributions": prediction["modality_contributions"],
+            "clinical_evidence": prediction["clinical_evidence"],
             "active_features": prediction["active_features"],
             "model": "multimodal",
             "eye_quality_score": eye_quality,

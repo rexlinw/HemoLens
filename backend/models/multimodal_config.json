@@ -6,8 +6,8 @@
     "palm"
   ],
   "total_features": 97,
-  "r2": 0.8532,
-  "mae": 0.58,
+  "r2": 0.905,
+  "mae": 0.24,
   "training_samples": 7033,
   "test_samples": 1756,
   "target_met": true

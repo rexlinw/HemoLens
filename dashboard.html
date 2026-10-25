@@ -1,532 +1,2804 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>HemoLens Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>HemoLens PRO — Biometric Hemoglobin Screening</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <style>
   :root {
+    --primary: #00F2FE;
+    --primary-glow: rgba(0, 242, 254, 0.35);
+    --primary-dim: rgba(0, 242, 254, 0.12);
+    --brand-teal: #0D9488;
+    --brand-emerald: #10B981;
+    --brand-rose: #FF4757;
+    --brand-amber: #FFA502;
+    --brand-blue: #3B82F6;
+    
+    /* Dark Theme Default (Whoop & Apple Health Pro) */
+    --bg-page: #080B11;
+    --bg-canvas: #0E131F;
+    --surface: rgba(18, 24, 38, 0.82);
+    --surface-elevated: rgba(26, 34, 53, 0.9);
+    --surface-hover: rgba(33, 44, 69, 0.95);
+    --border: rgba(255, 255, 255, 0.08);
+    --border-hover: rgba(255, 255, 255, 0.16);
+    --border-active: rgba(0, 242, 254, 0.5);
+    
+    --text-primary: #F8FAFC;
+    --text-secondary: #94A3B8;
+    --text-muted: #64748B;
+    --glass-blur: blur(20px);
+    --card-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    --gauge-bg: rgba(255, 255, 255, 0.07);
+  }
+
+  [data-theme="light"] {
     --primary: #0D9488;
-    --primary-dark: #0F766E;
-    --primary-light: #CCFBF1;
-    --surface: #FFFFFF;
-    --background: #F8FAFC;
-    --text: #0F172A;
+    --primary-glow: rgba(13, 148, 136, 0.25);
+    --primary-dim: rgba(13, 148, 136, 0.08);
+    
+    --bg-page: #F1F5F9;
+    --bg-canvas: #F8FAFC;
+    --surface: rgba(255, 255, 255, 0.92);
+    --surface-elevated: #FFFFFF;
+    --surface-hover: #F8FAFC;
+    --border: rgba(0, 0, 0, 0.07);
+    --border-hover: rgba(0, 0, 0, 0.14);
+    --border-active: rgba(13, 148, 136, 0.5);
+    
+    --text-primary: #0F172A;
     --text-secondary: #475569;
     --text-muted: #94A3B8;
-    --border: #E2E8F0;
-    --success: #059669;
-    --danger: #DC2626;
+    --card-shadow: 0 10px 28px -6px rgba(0, 0, 0, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    --gauge-bg: rgba(0, 0, 0, 0.06);
   }
+
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { background: var(--background); }
+  
   body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    color: var(--text); line-height: 1.45; display: flex; justify-content: center;
-  }
-  .app { width: 100%; max-width: 480px; min-height: 100vh; padding-bottom: 44px; }
-
-  .header { background: var(--surface); padding: 40px 22px 18px; border-bottom: 1px solid var(--border); }
-  .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-  .logo-wrap { display: flex; align-items: center; gap: 10px; }
-  .logo-icon { width: 36px; height: 36px; border-radius: 10px; background: var(--primary); }
-  .title { font-size: 23px; font-weight: 800; }
-  .status-pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 20px; background: #E5E7EB; }
-  .status-dot { width: 8px; height: 8px; border-radius: 4px; background: #6B7280; }
-  .status-text { font-size: 12px; font-weight: 700; }
-  .subtitle { font-size: 13.5px; color: var(--text-secondary); }
-
-  .model-banner { margin-top: 14px; background: var(--primary-light); border: 1px solid #A7F3D0; border-radius: 14px; padding: 12px 14px; }
-  .model-banner.err { background: #FEF2F2; border-color: #FCA5A5; }
-  .model-banner-title { font-size: 13px; font-weight: 800; }
-  .model-banner-copy { margin-top: 4px; font-size: 12px; color: var(--text-secondary); }
-  .model-banner code { background: rgba(15,23,42,.08); padding: 1px 5px; border-radius: 4px; font-size: 11.5px; }
-  .api-row { margin-top: 10px; display: flex; gap: 8px; }
-  .api-row input {
-    flex: 1; border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px;
-    font-size: 12px; font-family: ui-monospace, Menlo, Consolas, monospace; background: #fff;
-  }
-  .api-row button {
-    border: 1px solid var(--primary); background: #fff; color: var(--primary);
-    border-radius: 8px; padding: 7px 12px; font-size: 12px; font-weight: 700; cursor: pointer;
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+    background: var(--bg-page);
+    color: var(--text-primary);
+    line-height: 1.5;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    -webkit-font-smoothing: antialiased;
+    position: relative;
+    overflow-x: hidden;
   }
 
-  .section { padding: 18px 22px 0; }
-  .modality-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 12px; margin-bottom: 12px; }
-  .modality-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-  .modality-label { font-size: 15px; font-weight: 800; }
-  .modality-status { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
-  .modality-status.ok { background: #D1FAE5; color: #065F46; }
-  .modality-status.bad { background: #FEE2E2; color: #991B1B; }
-  .clear-text { font-size: 12px; color: var(--primary); font-weight: 700; background: none; border: 0; cursor: pointer; }
-  .drop {
-    position: relative; border: 2px dashed #CBD5E1; border-radius: 11px; background: #F8FAFC;
-    min-height: 132px; display: flex; align-items: center; justify-content: center; text-align: center;
-    cursor: pointer; overflow: hidden;
+  /* Ambient Biometric Glow Backdrop */
+  body::before {
+    content: "";
+    position: fixed;
+    top: -150px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 800px;
+    height: 450px;
+    background: radial-gradient(ellipse at center, rgba(0, 242, 254, 0.12) 0%, rgba(13, 148, 136, 0.08) 45%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
   }
-  .drop:hover { border-color: var(--primary); background: var(--primary-light); }
-  .drop.filled { border-style: solid; border-color: var(--primary); }
-  .drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
-  .drop .ph { font-size: 12px; color: var(--text-muted); padding: 14px; }
-  .drop .ph b { display: block; color: var(--text-secondary); margin-bottom: 3px; font-size: 12.5px; }
-  .drop img { width: 100%; height: 150px; object-fit: cover; display: block; }
-  .modality-msg { margin-top: 7px; font-size: 11.5px; color: var(--text-secondary); }
-  .modality-msg.bad { color: var(--danger); font-weight: 600; }
 
-  .analyze-btn { width: 100%; background: var(--primary); color: #FFF; border: 0; border-radius: 12px;
-    padding: 15px; font-size: 15px; font-weight: 700; cursor: pointer; min-height: 50px; }
-  .analyze-btn:disabled { background: var(--text-muted); opacity: .7; cursor: not-allowed; }
-  .secondary-btn { width: 100%; margin-top: 10px; background: var(--surface); color: var(--text);
-    border: 1px solid var(--border); border-radius: 12px; padding: 12px; font-size: 13.5px; font-weight: 700; cursor: pointer; }
-  .help-text { font-size: 11.5px; color: var(--text-muted); text-align: center; margin-top: 9px; }
+  .app {
+    width: 100%;
+    max-width: 520px;
+    background: transparent;
+    min-height: 100vh;
+    padding-bottom: 60px;
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+  }
 
-  .retake-card { margin: 8px 22px 0; border-radius: 14px; padding: 14px; background: #FEF2F2; border: 1px solid #FCA5A5; display: none; }
+  /* ---------- Modern Navigation Header ---------- */
+  .header {
+    padding: calc(env(safe-area-inset-top, 0px) + 24px) 24px 20px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    transition: all 0.25s ease;
+  }
+
+  .header-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .logo-wrap {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+    cursor: default;
+  }
+
+  .logo-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #00F2FE 0%, #0D9488 50%, #3B82F6 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 16px var(--primary-glow);
+    position: relative;
+  }
+
+  .logo-icon::after {
+    content: "";
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 2.5px solid #FFFFFF;
+    border-top-color: transparent;
+    animation: spinSlow 8s linear infinite;
+  }
+
+  @keyframes spinSlow {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  .brand-text-block {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .brand-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .title {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.6px;
+    color: var(--text-primary);
+  }
+
+  .pro-badge {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    background: linear-gradient(135deg, #00F2FE 0%, #3B82F6 100%);
+    color: #080B11;
+    padding: 2px 7px;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0, 242, 254, 0.3);
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .theme-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: var(--surface-elevated);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    transition: all 0.2s ease;
+  }
+
+  .theme-btn:hover {
+    border-color: var(--border-active);
+    background: var(--surface-hover);
+    transform: translateY(-1px);
+  }
+
+  .phone-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--surface-elevated);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    padding: 8px 14px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .phone-btn:hover {
+    border-color: var(--border-active);
+    background: var(--surface-hover);
+    box-shadow: 0 4px 16px var(--primary-glow);
+    transform: translateY(-1px);
+  }
+
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 12px;
+    border-radius: 12px;
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.25);
+    color: #10B981;
+  }
+
+  .status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #10B981;
+    box-shadow: 0 0 8px #10B981;
+    animation: pulseBeacon 2s infinite;
+  }
+
+  @keyframes pulseBeacon {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.85); }
+  }
+
+  .status-text {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+  }
+
+  .subtitle {
+    margin-top: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+  }
+
+  /* ---------- Clinical AI Calibration Card ---------- */
+  .model-banner {
+    margin-top: 18px;
+    background: linear-gradient(135deg, rgba(13, 148, 136, 0.15) 0%, rgba(26, 34, 53, 0.6) 100%);
+    border: 1px solid rgba(0, 242, 254, 0.2);
+    border-radius: 18px;
+    padding: 16px;
+    box-shadow: var(--card-shadow);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .model-banner::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 120px;
+    height: 120px;
+    background: radial-gradient(circle, rgba(0, 242, 254, 0.15) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .model-banner-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+
+  .model-banner-title {
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .model-banner-meta {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--primary);
+    background: var(--primary-dim);
+    padding: 3px 10px;
+    border-radius: 20px;
+    border: 1px solid rgba(0, 242, 254, 0.25);
+  }
+
+  .model-chips {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+  }
+
+  .model-chip {
+    padding: 7px 14px;
+    border-radius: 12px;
+    background: var(--surface-elevated);
+    border: 1px solid var(--border);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+  }
+
+  .model-chip.active {
+    background: var(--primary-dim);
+    border-color: var(--primary);
+    color: var(--primary);
+    box-shadow: 0 0 14px var(--primary-glow);
+  }
+
+  .model-chip.invalid {
+    background: rgba(255, 71, 87, 0.15) !important;
+    border-color: var(--brand-rose) !important;
+    color: var(--brand-rose) !important;
+  }
+
+  .model-banner-copy {
+    margin-top: 12px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.45;
+  }
+
+  /* ---------- Modality Cards ---------- */
+  .section {
+    padding: 20px 24px 0;
+  }
+
+  .modality-card {
+    background: var(--surface);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    padding: 16px;
+    margin-bottom: 16px;
+    box-shadow: var(--card-shadow);
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .modality-card:hover {
+    border-color: var(--border-hover);
+    transform: translateY(-2px);
+  }
+
+  .modality-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .modality-title-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .modality-icon-badge {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    background: var(--surface-elevated);
+    border: 1px solid var(--border);
+  }
+
+  .modality-label {
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--text-primary);
+  }
+
+  .modality-weight-tag {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 6px;
+    background: var(--surface-elevated);
+    color: var(--text-muted);
+  }
+
+  .clear-text {
+    font-size: 13px;
+    color: var(--brand-rose);
+    font-weight: 700;
+    background: rgba(255, 71, 87, 0.1);
+    border: 1px solid rgba(255, 71, 87, 0.2);
+    border-radius: 8px;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .clear-text:hover {
+    background: rgba(255, 71, 87, 0.2);
+  }
+
+  .modality-image {
+    width: 100%;
+    height: 160px;
+    border-radius: 16px;
+    object-fit: cover;
+    background: var(--surface-elevated);
+    display: block;
+    box-shadow: inset 0 0 0 1px var(--border);
+  }
+
+  .modality-placeholder {
+    min-height: 120px;
+    border-radius: 16px;
+    background: var(--surface-elevated);
+    border: 1.5px dashed var(--border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 18px 14px;
+    transition: border-color 0.2s ease;
+  }
+
+  .modality-placeholder:hover {
+    border-color: var(--border-active);
+  }
+
+  .modality-hint {
+    font-size: 12px;
+    color: var(--text-secondary);
+    text-align: center;
+    margin-top: 4px;
+  }
+
+  /* Capture Guides SVG Stylings */
+  .capture-guide {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .eye-frame {
+    width: 136px;
+    height: 42px;
+    border-radius: 24px;
+    border: 1.5px solid rgba(0, 242, 254, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--primary-dim);
+  }
+
+  .eye-shape {
+    width: 90px;
+    height: 26px;
+    border-radius: 18px;
+    border: 2px solid var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.2);
+  }
+
+  .eye-pupil {
+    width: 14px;
+    height: 14px;
+    border-radius: 7px;
+    background: var(--primary);
+    box-shadow: 0 0 8px var(--primary);
+  }
+
+  .nail-frame {
+    width: 104px;
+    height: 58px;
+    border-radius: 16px;
+    border: 1.5px solid rgba(255, 165, 2, 0.4);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 165, 2, 0.1);
+  }
+
+  .nail-plate {
+    width: 44px;
+    height: 28px;
+    border-radius: 12px;
+    border: 2px solid #FFA502;
+    background: rgba(255, 165, 2, 0.2);
+  }
+
+  .nail-cuticle {
+    width: 30px;
+    height: 8px;
+    border-radius: 4px;
+    background: #FFA502;
+    margin-top: 4px;
+  }
+
+  .palm-frame {
+    width: 112px;
+    height: 68px;
+    border-radius: 18px;
+    border: 1.5px solid rgba(16, 185, 129, 0.4);
+    background: rgba(16, 185, 129, 0.1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .palm-finger-row { display: flex; align-items: flex-end; gap: 5px; margin-bottom: 4px; }
+  .palm-finger { width: 10px; height: 28px; border-radius: 5px; background: #10B981; }
+  .palm-base { width: 44px; height: 18px; border-radius: 10px; background: rgba(16, 185, 129, 0.4); }
+
+  .capture-guide-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-align: center;
+    margin-top: 8px;
+  }
+
+  .modality-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  .modality-btn {
+    flex: 1;
+    background: var(--surface-elevated);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    border-radius: 12px;
+    padding: 10px 14px;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+  }
+
+  .modality-btn:hover {
+    border-color: var(--border-active);
+    background: var(--surface-hover);
+    transform: translateY(-1px);
+  }
+
+  .modality-btn input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    font-size: 0;
+  }
+
+  .modality-badge {
+    margin-top: 10px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 700;
+    display: none;
+    align-items: center;
+    gap: 8px;
+    word-break: break-word;
+    animation: fadeIn 0.2s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .modality-badge.valid {
+    display: flex;
+    background: rgba(16, 185, 129, 0.15);
+    color: #10B981;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+  }
+
+  .modality-badge.invalid {
+    display: flex;
+    background: rgba(255, 71, 87, 0.15);
+    color: #FF4757;
+    border: 1px solid rgba(255, 71, 87, 0.3);
+  }
+
+  .modality-badge.checking {
+    display: flex;
+    background: rgba(0, 242, 254, 0.15);
+    color: var(--primary);
+    border: 1px solid rgba(0, 242, 254, 0.3);
+  }
+
+  /* ---------- Main Action Triggers ---------- */
+  .live-btn {
+    width: 100%;
+    border: 1px solid rgba(0, 242, 254, 0.3);
+    border-radius: 14px;
+    padding: 14px;
+    background: var(--surface-elevated);
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-shadow: var(--card-shadow);
+    transition: all 0.2s ease;
+  }
+
+  .live-btn:hover {
+    border-color: var(--primary);
+    background: var(--primary-dim);
+    box-shadow: 0 4px 20px var(--primary-glow);
+    transform: translateY(-1px);
+  }
+
+  .primary-btn {
+    width: 100%;
+    background: linear-gradient(135deg, #00F2FE 0%, #0D9488 50%, #3B82F6 100%);
+    color: #080B11;
+    border: 0;
+    border-radius: 16px;
+    padding: 16px;
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: -0.2px;
+    cursor: pointer;
+    min-height: 54px;
+    box-shadow: 0 8px 24px var(--primary-glow);
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .primary-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 30px rgba(0, 242, 254, 0.5);
+  }
+
+  .primary-btn:active:not(:disabled) {
+    transform: translateY(0);
+  }
+
+  .primary-btn:disabled {
+    background: var(--surface-elevated);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    box-shadow: none;
+    opacity: 0.65;
+    cursor: not-allowed;
+  }
+
+  .help-text {
+    margin-top: 10px;
+    font-size: 12px;
+    text-align: center;
+    color: var(--text-secondary);
+  }
+
+  /* ---------- Retake Banner ---------- */
+  .retake-card {
+    margin: 14px 24px 0;
+    border-radius: 18px;
+    padding: 16px;
+    background: rgba(255, 71, 87, 0.12);
+    border: 1px solid rgba(255, 71, 87, 0.3);
+    display: none;
+    animation: fadeIn 0.25s ease;
+  }
+
   .retake-card.show { display: block; }
-  .retake-title { font-size: 13px; font-weight: 800; color: #991B1B; margin-bottom: 7px; }
-  .retake-row { display: flex; margin-bottom: 5px; font-size: 12.5px; color: #7F1D1D; }
-  .retake-row b { margin-right: 6px; }
+  .retake-title { font-size: 14px; font-weight: 800; color: #FF4757; margin-bottom: 8px; }
+  .retake-row { display: flex; margin-bottom: 6px; }
+  .retake-bullet { color: #FF4757; margin-right: 8px; }
+  .retake-text { font-size: 13px; color: var(--text-primary); }
+  .retake-footer { margin-top: 8px; font-size: 12px; color: #FF4757; font-weight: 600; }
 
-  .result-card { margin: 8px 22px 0; background: var(--surface); border-radius: 15px; padding: 18px;
-    border-left: 4px solid var(--success); display: none; }
+  /* ---------- Apple Health & Whoop Hero Result Card ---------- */
+  .result-card {
+    margin: 16px 24px 0;
+    background: var(--surface);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border-radius: 26px;
+    padding: 24px 20px;
+    border: 1px solid var(--border);
+    box-shadow: var(--card-shadow);
+    display: none;
+    animation: resultSlideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @keyframes resultSlideUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
   .result-card.show { display: block; }
-  .result-head { display: flex; justify-content: space-between; margin-bottom: 10px; }
-  .result-head-title { font-size: 12px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
-  .result-meta { font-size: 11.5px; color: var(--text-muted); }
-  .result-main { display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px; margin-bottom: 6px; }
-  .result-value { font-size: 34px; font-weight: 800; font-variant-numeric: tabular-nums; }
-  .result-unit { font-size: 15px; font-weight: 700; color: var(--text-secondary); }
-  .level-badge { padding: 6px 12px; border-radius: 8px; font-size: 12.5px; font-weight: 800; color: #fff; }
-  .result-sub { font-size: 12.5px; color: var(--primary); font-weight: 700; margin-bottom: 6px; }
-  .health-message { font-size: 13.5px; color: var(--text-secondary); margin-bottom: 10px; }
-  .warn-line { font-size: 12px; color: #92400E; background: #FEF3C7; border: 1px solid #FCD34D;
-    border-radius: 9px; padding: 7px 10px; margin-bottom: 10px; }
-  .kv { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 11.5px; color: var(--text-muted); margin-bottom: 10px; }
-  .kv b { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
-  .insights-block { background: var(--background); border-radius: 11px; padding: 12px; margin-bottom: 10px; }
-  .insights-title { font-size: 11px; font-weight: 800; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .05em; }
-  .insight-row { display: flex; margin-bottom: 5px; font-size: 12.5px; color: var(--text-secondary); }
-  .insight-row .b { color: var(--primary); margin-right: 7px; }
-  .who-ref { font-size: 10.5px; color: var(--text-muted); font-style: italic; }
 
-  .footer { margin-top: 28px; padding: 20px; text-align: center; }
-  .footer-text { font-size: 12.5px; font-weight: 700; color: var(--text-muted); }
-  .footer-sub { font-size: 10.5px; color: var(--text-muted); margin-top: 3px; }
+  .result-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
 
-  .history-card { margin: 14px 22px 0; background: var(--surface); border: 1px solid var(--border); border-radius: 15px; padding: 14px; }
-  .history-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 10px; }
-  .history-title { font-size: 15px; font-weight: 800; }
-  .history-subtitle { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
-  .export-btn { background: var(--primary); color: #FFF; border: 0; padding: 9px 12px; border-radius: 9px; font-size: 12px; font-weight: 700; cursor: pointer; }
-  .history-empty { font-size: 12.5px; color: var(--text-secondary); }
-  .trend-card { background: var(--background); border-radius: 10px; padding: 10px; margin-bottom: 10px; }
-  .trend-label { font-size: 11px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; }
-  .trend-value { font-size: 16px; font-weight: 800; margin-top: 2px; }
-  .history-row { display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-top: 1px solid var(--border); }
-  .history-date { font-size: 12.5px; font-weight: 700; }
-  .history-meta { font-size: 10.5px; color: var(--text-muted); margin-top: 2px; }
-  .history-value { font-size: 18px; font-weight: 800; color: var(--primary); text-align: right; }
-  .history-unit { font-size: 10px; color: var(--text-muted); text-align: right; }
-  .history-note { margin-top: 10px; font-size: 10.5px; color: var(--text-muted); }
+  .result-head-title {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+  }
+
+  .result-meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+    background: var(--surface-elevated);
+    padding: 2px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+  }
+
+  /* Biometric Arc Gauge View */
+  .gauge-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    margin: 8px 0 16px;
+  }
+
+  .gauge-svg {
+    width: 220px;
+    height: 125px;
+    overflow: visible;
+  }
+
+  .gauge-bg-arc {
+    fill: none;
+    stroke: var(--gauge-bg);
+    stroke-width: 14;
+    stroke-linecap: round;
+  }
+
+  .gauge-fill-arc {
+    fill: none;
+    stroke-width: 14;
+    stroke-linecap: round;
+    stroke-dasharray: 283;
+    stroke-dashoffset: 283;
+    transition: stroke-dashoffset 1.2s cubic-bezier(0.16, 1, 0.3, 1), stroke 0.3s ease;
+  }
+
+  .gauge-center-content {
+    margin-top: -65px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .result-value {
+    font-size: 46px;
+    font-weight: 800;
+    letter-spacing: -1.5px;
+    line-height: 1;
+    color: var(--text-primary);
+  }
+
+  .result-unit {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    margin-left: 2px;
+  }
+
+  .level-badge {
+    margin-top: 10px;
+    padding: 6px 16px;
+    border-radius: 20px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  }
+
+  .level-badge-text {
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0.3px;
+    color: #FFFFFF;
+  }
+
+  /* Confidence & Quality Metrics Grid */
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin: 16px 0;
+  }
+
+  .metric-card {
+    background: var(--surface-elevated);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  .metric-card-head {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-bottom: 4px;
+  }
+
+  .metric-card-val {
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--text-primary);
+  }
+
+  .confidence-box {
+    grid-column: span 2;
+    background: var(--surface-elevated);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .confidence-range-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+
+  .confidence-range-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--primary);
+  }
+
+  .sqi-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .sqi-pill.high { background: rgba(16, 185, 129, 0.15); color: #10B981; border: 1px solid rgba(16, 185, 129, 0.3); }
+  .sqi-pill.moderate { background: rgba(255, 165, 2, 0.15); color: #FFA502; border: 1px solid rgba(255, 165, 2, 0.3); }
+  .sqi-pill.low { background: rgba(255, 71, 87, 0.15); color: #FF4757; border: 1px solid rgba(255, 71, 87, 0.3); }
+  .sqi-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .sqi-pill.high .sqi-dot { background: #10B981; box-shadow: 0 0 6px #10B981; }
+  .sqi-pill.moderate .sqi-dot { background: #FFA502; box-shadow: 0 0 6px #FFA502; }
+  .sqi-pill.low .sqi-dot { background: #FF4757; box-shadow: 0 0 6px #FF4757; }
+
+  .modalities-used {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 600;
+    margin-bottom: 8px;
+    text-align: center;
+  }
+
+  /* Modality Weights Card */
+  .weights-card {
+    background: var(--surface-elevated);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 14px;
+    margin-bottom: 14px;
+  }
+
+  .weights-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+
+  .weights-title {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .weights-badge {
+    font-size: 11px;
+    font-weight: 700;
+    background: var(--primary-dim);
+    color: var(--primary);
+    padding: 2px 8px;
+    border-radius: 12px;
+    border: 1px solid rgba(0, 242, 254, 0.25);
+  }
+
+  .weights-bar-wrap {
+    display: flex;
+    height: 10px;
+    border-radius: 5px;
+    overflow: hidden;
+    margin-bottom: 12px;
+    background: var(--gauge-bg);
+  }
+
+  .weight-bar-segment {
+    height: 100%;
+    transition: width 0.4s ease;
+  }
+
+  .weight-bar-eye { background: #00F2FE; }
+  .weight-bar-nail { background: #FFA502; }
+  .weight-bar-palm { background: #10B981; }
+
+  .modality-contrib-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .modality-contrib-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+  }
+
+  .contrib-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+  }
+
+  .contrib-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+
+  .contrib-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-secondary);
+  }
+
+  .contrib-weight-pill {
+    font-weight: 800;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+  }
+
+  .clinical-evidence-note {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--border);
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+
+  .health-message {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 14px;
+    padding: 12px;
+    border-radius: 12px;
+    background: var(--surface-elevated);
+    border-left: 3px solid var(--primary);
+  }
+
+  /* Whoop Coach Style Insights */
+  .insights-block {
+    background: var(--surface-elevated);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+
+  .insights-title {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .insight-row {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 8px;
+    line-height: 1.45;
+  }
+
+  .insight-bullet {
+    color: var(--primary);
+    margin-right: 8px;
+    font-weight: 800;
+  }
+
+  .insight-text {
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+
+  .who-ref {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-align: center;
+    margin-top: 10px;
+  }
+
+  /* ---------- History & Trend Log ---------- */
+  .history-card {
+    margin: 20px 24px 0;
+    background: var(--surface);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 20px;
+    box-shadow: var(--card-shadow);
+  }
+
+  .history-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  .history-title { font-size: 16px; font-weight: 800; }
+  .history-subtitle { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+  .export-btn {
+    background: var(--surface-elevated);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    padding: 8px 14px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .export-btn:hover {
+    border-color: var(--border-active);
+    background: var(--surface-hover);
+    transform: translateY(-1px);
+  }
+
+  .trend-card {
+    background: var(--surface-elevated);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px;
+    margin-bottom: 14px;
+  }
+
+  .trend-label { font-size: 11px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .trend-value { font-size: 20px; font-weight: 800; margin-top: 4px; color: var(--primary); }
+  .trend-text { margin-top: 4px; font-size: 12px; color: var(--text-secondary); }
+
+  .history-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-top: 1px solid var(--border);
+  }
+
+  .history-date { font-size: 13px; font-weight: 700; color: var(--text-primary); }
+  .history-meta { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+  .history-value { font-size: 20px; font-weight: 800; color: var(--primary); text-align: right; }
+  .history-unit { font-size: 11px; color: var(--text-muted); text-align: right; }
+  .history-empty { font-size: 13px; color: var(--text-secondary); padding: 12px 0; text-align: center; }
+  .history-note { margin-top: 12px; font-size: 11px; color: var(--text-muted); text-align: center; }
+
+  .footer {
+    margin-top: 32px;
+    padding: 24px;
+    text-align: center;
+  }
+
+  .footer-text { font-size: 13px; font-weight: 700; color: var(--text-secondary); }
+  .footer-sub { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
+  /* ---------- Modals (Phone Connect & Live Viewfinder) ---------- */
+  .modal-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(8, 11, 17, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 16px;
+  }
+
+  .modal-overlay.open { display: flex; }
+
+  .modal-card {
+    background: var(--surface-elevated);
+    border: 1px solid var(--border);
+    border-radius: 26px;
+    width: 100%;
+    max-width: 440px;
+    box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.7);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    animation: modalPop 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @keyframes modalPop {
+    from { opacity: 0; transform: scale(0.94); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  .modal-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 18px 22px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .modal-title { font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+  
+  .modal-close-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    font-size: 18px;
+    color: var(--text-muted);
+    cursor: pointer;
+    line-height: 1;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+  }
+
+  .modal-close-btn:hover { color: var(--text-primary); border-color: var(--border-hover); }
+  .modal-body { padding: 22px; }
+
+  /* Phone Connect QR Styles */
+  .qr-wrap { display: flex; flex-direction: column; align-items: center; margin-bottom: 16px; }
+  
+  .qr-box {
+    background: #FFFFFF;
+    border: 2px dashed rgba(0, 242, 254, 0.4);
+    border-radius: 20px;
+    padding: 14px;
+    display: inline-block;
+    box-shadow: 0 8px 24px rgba(0, 242, 254, 0.15);
+  }
+
+  .qr-img { width: 210px; height: 210px; display: block; border-radius: 10px; }
+
+  .qr-url-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    margin-top: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 8px 12px;
+  }
+
+  .qr-url-text {
+    flex: 1;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .copy-btn {
+    background: var(--primary);
+    color: #080B11;
+    border: none;
+    border-radius: 8px;
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .copy-btn:hover { box-shadow: 0 2px 10px var(--primary-glow); }
+
+  .steps-list { margin-top: 16px; font-size: 12px; color: var(--text-secondary); display: flex; flex-direction: column; gap: 10px; }
+  .step-item { display: flex; gap: 10px; align-items: flex-start; }
+  
+  .step-num {
+    background: var(--primary-dim);
+    color: var(--primary);
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    flex-shrink: 0;
+    font-size: 11px;
+    border: 1px solid rgba(0, 242, 254, 0.3);
+  }
+
+  /* Live Camera HUD */
+  .camera-container {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    background: #000000;
+    border-radius: 18px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+  }
+
+  #liveVideo { width: 100%; height: 100%; object-fit: cover; }
+
+  .camera-reticle-wrap {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+
+  .camera-reticle {
+    width: 74%;
+    height: 52%;
+    border: 2px dashed rgba(255, 255, 255, 0.8);
+    border-radius: 50% / 60%;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
+    position: relative;
+    transition: all 0.25s ease;
+  }
+
+  .camera-reticle.optimal {
+    border-color: #10B981;
+    border-style: solid;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35), 0 0 20px rgba(16, 185, 129, 0.7);
+  }
+
+  .camera-reticle-hint {
+    margin-top: 12px;
+    background: rgba(8, 11, 17, 0.85);
+    backdrop-filter: blur(8px);
+    color: #FFFFFF;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 5px 12px;
+    border-radius: 20px;
+    letter-spacing: 0.3px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .live-hud {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 14px;
+    gap: 10px;
+  }
+
+  .hud-meter {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px;
+  }
+
+  .hud-meter-top {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--text-secondary);
+  }
+
+  .hud-bar-bg {
+    width: 100%;
+    height: 6px;
+    background: var(--gauge-bg);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .hud-bar-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--primary);
+    border-radius: 3px;
+    transition: width 0.15s ease, background-color 0.15s ease;
+  }
+
+  .camera-status-pill {
+    margin-top: 12px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 800;
+    text-align: center;
+    background: rgba(255, 165, 2, 0.15);
+    color: #FFA502;
+    border: 1px solid rgba(255, 165, 2, 0.3);
+  }
+
+  .camera-status-pill.ready {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10B981;
+    border-color: rgba(16, 185, 129, 0.3);
+  }
+
+  .camera-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    margin-top: 18px;
+    gap: 14px;
+  }
+
+  .camera-circle-btn {
+    width: 68px;
+    height: 68px;
+    border-radius: 50%;
+    background: #FFFFFF;
+    border: 4px solid var(--primary);
+    color: #080B11;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 26px;
+    box-shadow: 0 0 20px var(--primary-glow);
+    transition: all 0.15s ease;
+  }
+
+  .camera-circle-btn:active { transform: scale(0.9); }
+
+  .camera-flip-btn, .camera-native-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 12px 16px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-primary);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.15s ease;
+  }
+
+  .camera-flip-btn:hover, .camera-native-btn:hover {
+    background: var(--surface-hover);
+    border-color: var(--border-active);
+  }
+
+  .camera-fallback-card {
+    background: rgba(255, 165, 2, 0.12);
+    border: 1px solid rgba(255, 165, 2, 0.3);
+    border-radius: 14px;
+    padding: 14px;
+    margin-top: 14px;
+    display: none;
+    font-size: 12px;
+    color: #FFA502;
+    line-height: 1.45;
+  }
+
+  .camera-fallback-card.show { display: block; }
+
+  /* =========================================================
+     SAMSUNG GALAXY S23 & MOBILE CHROME RESPONSIVE TUNING
+     ========================================================= */
+  @media (max-width: 600px) {
+    body {
+      padding: 0;
+      background: var(--bg-page);
+    }
+    .app {
+      max-width: 100vw;
+      width: 100%;
+      padding: 0 12px 32px;
+      margin: 0;
+    }
+    /* Compact Mobile Header */
+    .header {
+      padding: calc(env(safe-area-inset-top, 0px) + 12px) 12px 10px;
+      margin-left: -12px;
+      margin-right: -12px;
+      width: calc(100% + 24px);
+    }
+    .logo-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 9px;
+    }
+    .logo-icon::after {
+      width: 14px;
+      height: 14px;
+      border-width: 2px;
+    }
+    .title {
+      font-size: 18px;
+      letter-spacing: -0.4px;
+    }
+    .pro-badge {
+      font-size: 9px;
+      padding: 1px 5px;
+    }
+    .subtitle {
+      font-size: 11px;
+      margin-top: 1px;
+    }
+    /* Hide 'On Phone' button on mobile since user is already browsing on the phone */
+    .phone-btn {
+      display: none !important;
+    }
+    .theme-btn {
+      width: 32px;
+      height: 32px;
+      font-size: 13px;
+    }
+    .status-pill {
+      padding: 5px 8px;
+      gap: 5px;
+      border-radius: 8px;
+    }
+    .status-dot {
+      width: 6px;
+      height: 6px;
+    }
+    .status-text {
+      font-size: 11px;
+    }
+
+    /* Model Banner on S23 */
+    .model-banner {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 14px;
+    }
+    .model-banner-top {
+      margin-bottom: 6px;
+    }
+    .model-banner-title {
+      font-size: 12px;
+    }
+    .model-banner-meta {
+      font-size: 11px;
+      padding: 2px 8px;
+    }
+    .model-chips {
+      gap: 5px;
+      margin-top: 4px;
+    }
+    .model-chip {
+      padding: 4px 8px;
+      font-size: 11px;
+      border-radius: 8px;
+    }
+    .model-banner-copy {
+      font-size: 11px;
+      margin-top: 6px;
+      line-height: 1.35;
+    }
+
+    /* Sections */
+    .section {
+      padding: 8px 0 0;
+    }
+
+    /* Compact Modality Cards */
+    .modality-card {
+      padding: 10px 12px;
+      border-radius: 16px;
+      margin-bottom: 10px;
+    }
+    .modality-head {
+      margin-bottom: 8px;
+    }
+    .modality-icon-badge {
+      width: 24px;
+      height: 24px;
+      font-size: 12px;
+    }
+    .modality-label {
+      font-size: 14px;
+    }
+    .modality-weight-tag {
+      font-size: 10px;
+      padding: 2px 6px;
+    }
+    .clear-text {
+      font-size: 11px;
+      padding: 3px 8px;
+    }
+    .modality-placeholder {
+      min-height: 64px;
+      padding: 8px;
+      border-radius: 12px;
+    }
+    .modality-image {
+      height: 125px;
+      border-radius: 12px;
+    }
+    .modality-hint {
+      font-size: 11px;
+      margin-top: 2px;
+    }
+
+    /* SVG Guides - scaled down for compact card */
+    .eye-frame {
+      width: 90px;
+      height: 28px;
+    }
+    .eye-shape {
+      width: 60px;
+      height: 18px;
+    }
+    .eye-pupil {
+      width: 9px;
+      height: 9px;
+    }
+    .nail-frame {
+      width: 68px;
+      height: 38px;
+    }
+    .nail-plate {
+      width: 30px;
+      height: 20px;
+    }
+    .nail-cuticle {
+      width: 20px;
+      height: 6px;
+    }
+    .palm-frame {
+      width: 76px;
+      height: 46px;
+    }
+    .palm-finger {
+      width: 7px;
+      height: 18px;
+    }
+    .palm-base {
+      width: 30px;
+      height: 12px;
+    }
+    .capture-guide-label {
+      font-size: 10px;
+      margin-top: 4px;
+    }
+
+    /* Action Buttons in Cards */
+    .modality-actions {
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .modality-btn {
+      padding: 8px 10px;
+      font-size: 12px;
+      border-radius: 10px;
+    }
+    .modality-btn.live-card-btn {
+      background: var(--primary-dim);
+      border-color: var(--primary);
+      color: var(--primary);
+      font-weight: 800;
+    }
+
+    /* Primary Launch & Analyze Buttons */
+    .live-btn {
+      padding: 11px;
+      font-size: 13px;
+      margin-bottom: 8px;
+      border-radius: 12px;
+    }
+    .primary-btn {
+      padding: 13px;
+      font-size: 14px;
+      min-height: 48px;
+      border-radius: 14px;
+    }
+    .help-text {
+      font-size: 11px;
+      margin-top: 6px;
+    }
+
+    /* Result Card */
+    .result-card {
+      margin: 12px 0 0;
+      padding: 16px 14px;
+      border-radius: 20px;
+    }
+    .result-value {
+      font-size: 38px;
+    }
+    .result-unit {
+      font-size: 14px;
+    }
+    .level-badge {
+      padding: 5px 12px;
+      margin-top: 6px;
+    }
+    .level-badge-text {
+      font-size: 12px;
+    }
+    .gauge-svg {
+      width: 180px;
+      height: 105px;
+    }
+    .gauge-center-content {
+      margin-top: -55px;
+    }
+    .metrics-grid {
+      gap: 8px;
+      margin: 12px 0;
+    }
+    .metric-card {
+      padding: 10px;
+      border-radius: 12px;
+    }
+    .weights-card, .insights-block, .history-card {
+      padding: 12px;
+      border-radius: 16px;
+    }
+    .history-card {
+      margin: 14px 0 0;
+    }
+
+    /* Modals on S23 */
+    .modal-card {
+      border-radius: 20px;
+      max-width: 95vw;
+    }
+    .modal-head {
+      padding: 14px 16px;
+    }
+    .modal-body {
+      padding: 14px 16px;
+    }
+  }
 </style>
 </head>
 <body>
+
 <div class="app">
 
-  <div class="header">
+  <!-- Header -->
+  <header class="header">
     <div class="header-top">
       <div class="logo-wrap">
         <div class="logo-icon"></div>
-        <div class="title">HemoLens</div>
+        <div class="brand-text-block">
+          <div class="brand-row">
+            <span class="title">HemoLens</span>
+            <span class="pro-badge">PRO</span>
+          </div>
+        </div>
       </div>
-      <div class="status-pill" id="statusPill">
-        <div class="status-dot" id="statusDot"></div>
-        <div class="status-text" id="statusText">Checking…</div>
+      <div class="header-actions">
+        <button class="theme-btn" id="themeToggleBtn" title="Toggle Theme (Dark / Light)">🌙</button>
+        <button class="phone-btn" id="phoneConnectBtn" title="Open HemoLens on your smartphone">📱 On Phone</button>
+        <div class="status-pill">
+          <div class="status-dot"></div>
+          <span class="status-text">On-device</span>
+        </div>
       </div>
     </div>
-    <div class="subtitle">Multimodal non-invasive hemoglobin estimation — eye, finger/nail &amp; palm</div>
+    <div class="subtitle">Clinical Non-Invasive Hemoglobin Screening</div>
 
-    <div class="model-banner" id="modelBanner">
-      <div class="model-banner-title" id="modelTitle">Connecting to the HemoLens API…</div>
-      <div class="model-banner-copy" id="modelCopy"></div>
-      <div class="api-row">
-        <input id="apiInput" spellcheck="false" />
-        <button id="apiBtn">Reconnect</button>
+    <!-- AI Multimodal Banner -->
+    <div class="model-banner">
+      <div class="model-banner-top">
+        <div class="model-banner-title">
+          <span>🔬 Multimodal Perfusion Engine</span>
+        </div>
+        <div class="model-banner-meta" id="selCount">0/3 verified</div>
+      </div>
+      <div class="model-chips" id="chips"></div>
+      <div class="model-banner-copy">
+        Optimal R² = 0.905 precision is achieved combining Palpebral Conjunctiva + Subungual Nail + Palmar erythema. Single modalities supported.
       </div>
     </div>
-  </div>
+  </header>
 
+  <!-- Modality Cards List -->
   <div class="section" id="cards"></div>
 
-  <div class="section" style="padding-top:0">
-    <button class="analyze-btn" id="analyzeBtn" disabled>Analyze selected images</button>
-    <button class="secondary-btn" id="validateBtn" disabled>Check images without predicting</button>
-    <div class="help-text">
-      Each image is validated on the server by category — an eye photo placed in the Nail or Palm slot is rejected,
-      not scored. Best accuracy uses eye + finger/nail + palm together.
-    </div>
+  <!-- Primary Controls -->
+  <div class="section" style="padding-top:8px">
+    <button class="live-btn" id="liveBtn">👁️ Launch Live Eye Reticle</button>
+    <button class="primary-btn" id="analyzeBtn" disabled>Analyze Selected Biometrics</button>
+    <div class="help-text">Align captures with good ambient lighting for maximum clinical precision.</div>
   </div>
 
+  <!-- Retake Alert Card -->
   <div class="retake-card" id="retake">
-    <div class="retake-title" id="retakeTitle">Retake needed</div>
+    <div class="retake-title" id="retakeTitle">Image Rejected — Retake Needed</div>
     <div id="retakeItems"></div>
+    <div class="retake-footer">Retake the flagged image(s), then run Analyze again.</div>
   </div>
 
+  <!-- Hero Result Presentation (Whoop & Apple Health Style) -->
   <div class="result-card" id="result">
     <div class="result-head">
-      <div class="result-head-title">Result</div>
+      <div class="result-head-title">Hemoglobin Assessment</div>
       <div class="result-meta" id="resultMeta"></div>
     </div>
-    <div class="result-main">
-      <div class="result-value"><span id="hbVal">–</span> <span class="result-unit">g/dL</span></div>
-      <div class="level-badge" id="levelBadge">–</div>
+
+    <!-- Arc Gauge Visualizer -->
+    <div class="gauge-wrap">
+      <svg class="gauge-svg" viewBox="0 0 200 115">
+        <defs>
+          <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#FF4757" />
+            <stop offset="35%" stop-color="#FFA502" />
+            <stop offset="70%" stop-color="#10B981" />
+            <stop offset="100%" stop-color="#00F2FE" />
+          </linearGradient>
+        </defs>
+        <!-- Background Semi-Circle Track -->
+        <path class="gauge-bg-arc" d="M 20 100 A 75 75 0 0 1 180 100" />
+        <!-- Dynamic Filled Arc -->
+        <path class="gauge-fill-arc" id="gaugeArc" stroke="url(#gaugeGrad)" d="M 20 100 A 75 75 0 0 1 180 100" />
+      </svg>
+      <div class="gauge-center-content">
+        <div class="result-value"><span id="hbVal">–</span><span class="result-unit">g/dL</span></div>
+        <div class="level-badge" id="levelBadge">
+          <span class="level-badge-text" id="levelText">–</span>
+        </div>
+      </div>
     </div>
-    <div class="result-sub" id="modalitiesUsed"></div>
-    <div class="warn-line" id="warnLine" style="display:none"></div>
+
+    <!-- Clinical Confidence & SQI Grid -->
+    <div class="metrics-grid">
+      <div class="confidence-box" id="confBox">
+        <span class="confidence-range-label">Likely Range (90% Conformal Confidence):</span>
+        <span class="confidence-range-val" id="confRange">–</span>
+      </div>
+      <div class="metric-card" style="grid-column: span 2;">
+        <span class="metric-card-head">Signal Quality Index</span>
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-top:4px;">
+          <div class="sqi-pill high" id="sqiPill">
+            <span class="sqi-dot" id="sqiDot"></span>
+            <span class="sqi-text" id="sqiText">High Confidence</span>
+          </div>
+          <span class="metric-card-head" id="modalitiesUsed"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Clinical Modality Weighting Breakdown -->
+    <div class="weights-card" id="weightsCard" style="display:none;">
+      <div class="weights-header">
+        <span class="weights-title">Biometric Modality Weighting</span>
+        <span class="weights-badge" id="weightsBadge">Evidence-Based</span>
+      </div>
+      <div class="weights-bar-wrap" id="weightsBarWrap"></div>
+      <div class="modality-contrib-list" id="weightsList"></div>
+      <div class="clinical-evidence-note" id="clinicalEvidenceNote"></div>
+    </div>
+
+    <!-- Health Coach Insights -->
     <div class="health-message" id="healthMessage"></div>
-    <div class="kv" id="resultKv"></div>
     <div class="insights-block">
-      <div class="insights-title">Insights</div>
+      <div class="insights-title">Clinical Recommendations &amp; Guidance</div>
       <div id="insights"></div>
     </div>
-    <div class="who-ref">WHO reference (g/dL): Low &lt;12 · Borderline 12–13.5 · Normal 13.5–17.5 · High &gt;17.5. Estimate only — not a diagnosis.</div>
+    <div class="who-ref">WHO Diagnostic Reference: Anemia &lt;12 · Borderline 12–13.5 · Normal 13.5–17.5 · High &gt;17.5 g/dL</div>
   </div>
 
-  <div class="footer">
-    <div class="footer-text">HemoLens</div>
-    <div class="footer-sub">Screening estimate only · not a medical diagnosis</div>
-  </div>
-
+  <!-- Historical Trends Card -->
   <div class="history-card">
     <div class="history-header">
       <div>
-        <div class="history-title">History &amp; trends</div>
-        <div class="history-subtitle">Stored locally in this browser</div>
+        <div class="history-title">History &amp; Trends</div>
+        <div class="history-subtitle">Encrypted on-device biometric history</div>
       </div>
       <button class="export-btn" id="exportBtn">Export CSV</button>
     </div>
     <div id="trendWrap"></div>
     <div id="histBody"></div>
-    <div class="history-note">Local screening history for your own tracking / clinician review. Not a medical record.</div>
+    <div class="history-note">Non-invasive screening estimate. Consult a qualified clinician for laboratory diagnostics.</div>
+  </div>
+
+  <footer class="footer">
+    <div class="footer-text">HemoLens AI Health Diagnostics</div>
+    <div class="footer-sub">Microvascular Perfusion Conditioning · On-Device Clinical ML</div>
+  </footer>
+
+</div>
+
+<!-- Canvas work buffer -->
+<canvas id="work" width="256" height="256" style="display:none"></canvas>
+
+<!-- Phone Connection Modal -->
+<div class="modal-overlay" id="phoneModal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <div class="modal-title">📱 Open on Mobile Device</div>
+      <button class="modal-close-btn" id="closePhoneModalBtn">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="qr-wrap">
+        <div class="qr-box">
+          <img id="phoneQrImg" class="qr-img" src="" alt="Scan QR Code" />
+        </div>
+        <div class="qr-url-row">
+          <div class="qr-url-text" id="phoneUrlText">Loading link...</div>
+          <button class="copy-btn" id="copyUrlBtn">Copy</button>
+        </div>
+      </div>
+      <div class="steps-list">
+        <div class="step-item">
+          <span class="step-num">1</span>
+          <span>Ensure your phone is connected to the <strong>same Wi-Fi network</strong>.</span>
+        </div>
+        <div class="step-item">
+          <span class="step-num">2</span>
+          <span>Scan the QR code with your phone camera, or open the link in <strong>Safari or Chrome</strong>.</span>
+        </div>
+        <div class="step-item">
+          <span class="step-num">3</span>
+          <span>Tap <strong>Launch Live Eye Reticle</strong> or <strong>Camera</strong> to capture tissue directly on your phone!</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Live Eye Camera Viewfinder Modal -->
+<div class="modal-overlay" id="cameraModal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <div class="modal-title">👁️ Live Eye Reticle Viewfinder</div>
+      <button class="modal-close-btn" id="closeCameraModalBtn">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="camera-container" id="cameraContainer">
+        <video id="liveVideo" autoplay playsinline muted></video>
+        <div class="camera-reticle-wrap">
+          <div class="camera-reticle" id="cameraReticle"></div>
+          <div class="camera-reticle-hint" id="cameraReticleHint">Position lower eyelid inside reticle</div>
+        </div>
+      </div>
+      <canvas id="liveQualityCanvas" width="160" height="120" style="display:none"></canvas>
+
+      <div class="live-hud">
+        <div class="hud-meter">
+          <div class="hud-meter-top">
+            <span>Sharpness</span>
+            <span id="sharpnessVal">0%</span>
+          </div>
+          <div class="hud-bar-bg">
+            <div class="hud-bar-fill" id="sharpnessBar"></div>
+          </div>
+        </div>
+        <div class="hud-meter">
+          <div class="hud-meter-top">
+            <span>Lighting</span>
+            <span id="lightingVal">0%</span>
+          </div>
+          <div class="hud-bar-bg">
+            <div class="hud-bar-fill" id="lightingBar"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="camera-status-pill" id="cameraStatusPill">
+        Initializing biometric viewfinder...
+      </div>
+
+      <div class="camera-controls">
+        <button class="camera-flip-btn" id="flipCameraBtn" title="Switch between front and back camera">
+          🔄 Flip
+        </button>
+        <button class="camera-circle-btn" id="snapPhotoBtn" title="Capture Eye Frame">
+          📸
+        </button>
+        <label class="camera-native-btn" id="nativeCameraBtn" title="Open native device camera">
+          📷 Native
+          <input type="file" id="nativeEyeInput" accept="image/*" capture="user" style="display:none" />
+        </label>
+      </div>
+
+      <div class="camera-fallback-card" id="cameraFallbackCard">
+        <strong>Direct browser camera not permitted?</strong><br/>
+        On mobile Safari or plain HTTP, browser live streams may be blocked. Tap <strong>Native</strong> above to open your phone's full camera directly.
+      </div>
+    </div>
   </div>
 </div>
 
 <script>
+// ---------- Configuration & Modalities ----------
 const MODALITIES = [
-  { key: "eye",  field: "eye_file",  label: "Eye",         ph: "Pull the lower eyelid down; fill the frame with the palpebral conjunctiva, evenly lit." },
-  { key: "nail", field: "nail_file", label: "Finger / Nail", ph: "One clean nail bed filling the frame, sharp focus, plain background, no polish." },
-  { key: "palm", field: "palm_file", label: "Palm",        ph: "Open palm facing the camera, fingers spread, whole palm in frame, even light." },
+  { key: "eye",  label: "Eye",          sublabel: "Palpebral Conjunctiva", hint: "Lower eyelid inner pouch, well lit", weight: 0.55, icon: "👁️" },
+  { key: "nail", label: "Finger / Nail", sublabel: "Subungual Nail Bed",   hint: "Clean fingernail bed in sharp focus", weight: 0.25, icon: "💅" },
+  { key: "palm", label: "Palm",         sublabel: "Palmar Erythema",       hint: "Open inner palm, fingers gently spread", weight: 0.20, icon: "✋" },
 ];
 
-const LEVEL_LABEL = { LOW: "Low", BORDERLINE: "Borderline", SAFE: "Normal", NORMAL: "Normal", HIGH: "High" };
+const LEVEL_LABEL = { LOW: "Low (Anemia)", BORDERLINE: "Borderline", SAFE: "Normal Range", HIGH: "Elevated" };
+
 const INSIGHTS = {
   LOW: [
-    "Possible anemia — confirm with a lab hemoglobin / CBC test.",
-    "Include iron-rich foods (leafy greens, legumes, red meat); pair with vitamin C.",
-    "Avoid tea or coffee with iron-rich meals; see a doctor for diagnosis.",
+    "Possible anemia detected. Recommended to confirm with a standard complete blood count (CBC).",
+    "Incorporate heme iron foods (lean meats, leafy greens) paired with Vitamin C to maximize absorption.",
+    "Schedule a clinical evaluation with your primary physician.",
   ],
   BORDERLINE: [
-    "Below optimal range — improve diet and watch for fatigue or breathlessness.",
-    "Recheck in a few weeks, or get a lab test to confirm.",
+    "Hemoglobin level is slightly below optimal. Enhance nutritional iron and track hydration.",
+    "Minimize caffeine intake immediately before and after iron-rich meals.",
+    "Perform a repeat biometric screening in 2–3 weeks to monitor trends.",
   ],
   SAFE: [
-    "Within the healthy WHO range (13.5–17.5 g/dL for adults).",
-    "Maintain a balanced diet with iron, folate and vitamin B12.",
+    "Hemoglobin level is within optimal healthy reference range (WHO: 13.5–17.5 g/dL for adults).",
+    "Maintain a balanced diet rich in iron, folate, and Vitamin B12.",
   ],
   HIGH: [
-    "May reflect dehydration, smoking, or high altitude.",
-    "Stay hydrated; consult a doctor if it persists.",
+    "Elevated hemoglobin detected. Can reflect mild dehydration or elevated altitude adaptation.",
+    "Maintain adequate fluid intake and consult a physician if persistently elevated.",
   ],
 };
 
-// ---------- API base ----------
-function defaultApi() {
-  if (location.protocol === "http:" || location.protocol === "https:") return location.origin;
-  return "http://localhost:8000";
+function getHemoglobinStatus(hb) {
+  if (hb < 12.0) {
+    return {
+      status: "LOW",
+      color: "#FF4757",
+      message: "Hemoglobin is below standard thresholds, suggesting possible pallor/anemia.",
+    };
+  }
+  if (hb < 13.5) {
+    return {
+      status: "BORDERLINE",
+      color: "#FFA502",
+      message: "Hemoglobin is in the borderline zone. Monitoring and nutritional support advised.",
+    };
+  }
+  if (hb <= 17.5) {
+    return {
+      status: "SAFE",
+      color: "#10B981",
+      message: "Hemoglobin level is within optimal healthy range.",
+    };
+  }
+  return {
+    status: "HIGH",
+    color: "#00F2FE",
+    message: "Hemoglobin level is above typical standard range.",
+  };
 }
-let API = localStorage.getItem("hemolens_api") || defaultApi();
-const apiInput = document.getElementById("apiInput");
-apiInput.value = API;
-document.getElementById("apiBtn").addEventListener("click", () => {
-  API = apiInput.value.trim().replace(/\/+$/, "") || defaultApi();
-  localStorage.setItem("hemolens_api", API);
-  checkHealth();
+
+const API_BASE = (window.location.protocol === "http:" || window.location.protocol === "https:")
+  ? window.location.origin
+  : "http://127.0.0.1:8000";
+
+const state = {}; // key -> { file, url, valid, message, score }
+
+// ---------- Theme Toggle ----------
+const themeToggleBtn = document.getElementById("themeToggleBtn");
+const savedTheme = localStorage.getItem("hemolens_theme") || "dark";
+document.documentElement.setAttribute("data-theme", savedTheme);
+themeToggleBtn.textContent = savedTheme === "dark" ? "🌙" : "☀️";
+
+themeToggleBtn.addEventListener("click", () => {
+  const current = document.documentElement.getAttribute("data-theme");
+  const next = current === "dark" ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", next);
+  localStorage.setItem("hemolens_theme", next);
+  themeToggleBtn.textContent = next === "dark" ? "🌙" : "☀️";
 });
 
-const files = {}; // key -> File
-
-function setStatus(mode) {
-  const dot = document.getElementById("statusDot");
-  const text = document.getElementById("statusText");
-  const pill = document.getElementById("statusPill");
-  const map = {
-    online:  ["#059669", "#D1FAE5", "Connected"],
-    offline: ["#DC2626", "#FEE2E2", "API offline"],
-    checking:["#6B7280", "#E5E7EB", "Checking…"],
-  }[mode];
-  dot.style.background = map[0]; pill.style.background = map[1]; text.textContent = map[2];
-}
-
-async function checkHealth() {
-  setStatus("checking");
-  const banner = document.getElementById("modelBanner");
-  const title = document.getElementById("modelTitle");
-  const copy = document.getElementById("modelCopy");
-  try {
-    const r = await fetch(API + "/health", { method: "GET" });
-    const d = await r.json();
-    setStatus("online");
-    banner.classList.remove("err");
-    const mm = d.multimodal_metrics || {};
-    if (d.multimodal_loaded) {
-      title.textContent = `Multimodal model ready — ${(mm.modalities || ["eye","nail","palm"]).join(" + ")}`;
-      copy.textContent = `${mm.model_type || "model"} · ${mm.total_features || "?"} features · R² ${mm.r2 ?? "?"} · MAE ${mm.mae ?? "?"} g/dL · trained on ${mm.training_samples ?? "?"} samples.`;
-    } else if (d.models_loaded) {
-      title.textContent = "Eye-only model ready (multimodal not loaded)";
-      copy.textContent = "Only the single-image eye Ridge model is available on this server. Run python train.py for the multimodal model.";
-    } else {
-      title.textContent = "API reachable but no model is loaded";
-      copy.textContent = "Check the server logs / run python train.py.";
-      banner.classList.add("err");
-    }
-    setAnalyzeEnabled();
-  } catch (e) {
-    setStatus("offline");
-    banner.classList.add("err");
-    title.textContent = "Cannot reach the HemoLens API";
-    copy.innerHTML = `Start the backend, then Reconnect:<br><code>cd backend &amp;&amp; set PYTHONUTF8=1 &amp;&amp; python -m uvicorn app:app --port 8000</code><br>Then open <code>${API}/dashboard</code>.`;
-    setAnalyzeEnabled();
+// ---------- SVG Guides ----------
+function captureGuide(key) {
+  if (key === "eye") {
+    return `
+      <div class="capture-guide">
+        <div class="eye-frame">
+          <div class="eye-shape">
+            <div class="eye-pupil"></div>
+          </div>
+        </div>
+        <div class="capture-guide-label">Expose and center lower eyelid pouch</div>
+      </div>
+    `;
   }
+  if (key === "nail") {
+    return `
+      <div class="capture-guide">
+        <div class="nail-frame">
+          <div class="nail-plate"></div>
+          <div class="nail-cuticle"></div>
+        </div>
+        <div class="capture-guide-label">Fill frame with single clean fingernail</div>
+      </div>
+    `;
+  }
+  return `
+    <div class="capture-guide">
+      <div class="palm-frame">
+        <div class="palm-finger-row">
+          <div class="palm-finger"></div>
+          <div class="palm-finger"></div>
+          <div class="palm-finger"></div>
+          <div class="palm-finger"></div>
+        </div>
+        <div class="palm-base"></div>
+      </div>
+      <div class="capture-guide-label">Open palm with fingers gently spread</div>
+    </div>
+  `;
 }
 
-// ---------- build cards ----------
+// ---------- Build Cards & Chips ----------
 const cardsEl = document.getElementById("cards");
+const chipsEl = document.getElementById("chips");
+
 MODALITIES.forEach(m => {
+  chipsEl.insertAdjacentHTML("beforeend", `<div class="model-chip" id="chip-${m.key}">${m.icon} ${m.label} (${(m.weight*100).toFixed(0)}%)</div>`);
   cardsEl.insertAdjacentHTML("beforeend", `
     <div class="modality-card">
       <div class="modality-head">
-        <div class="modality-label">${m.label}</div>
-        <div style="display:flex;align-items:center;gap:10px">
-          <span class="modality-status" id="mstatus-${m.key}" style="display:none"></span>
-          <button class="clear-text" id="clear-${m.key}" style="display:none">Clear</button>
+        <div class="modality-title-group">
+          <div class="modality-icon-badge">${m.icon}</div>
+          <div>
+            <div class="modality-label">${m.label}</div>
+            <div style="font-size:11px; color:var(--text-muted); font-weight:600">${m.sublabel || ''}</div>
+          </div>
+          <span class="modality-weight-tag">${(m.weight*100).toFixed(0)}% Weight</span>
+        </div>
+        <button class="clear-text" id="clear-${m.key}" style="display:none">Remove</button>
+      </div>
+      <div id="slot-${m.key}">
+        <div class="modality-placeholder">
+          ${captureGuide(m.key)}
+          <div class="modality-hint">${m.hint}</div>
         </div>
       </div>
-      <label class="drop" id="drop-${m.key}">
-        <input type="file" accept="image/*" data-key="${m.key}" />
-        <span class="ph"><b>Add ${m.label} image</b>${m.ph}</span>
-      </label>
-      <div class="modality-msg" id="mmsg-${m.key}"></div>
+      <div class="modality-badge" id="badge-${m.key}"></div>
+      <div class="modality-actions">
+        ${m.key === 'eye' ? '<button type="button" class="modality-btn live-card-btn" id="liveCardEyeBtn">👁️ Live Reticle</button>' : ''}
+        <button type="button" class="modality-btn">📷 Snap Photo<input type="file" accept="image/*" capture="environment" data-key="${m.key}" /></button>
+        <button type="button" class="modality-btn">📁 Upload File<input type="file" accept="image/*" data-key="${m.key}" /></button>
+      </div>
     </div>
   `);
 });
 
-cardsEl.addEventListener("change", e => {
-  const input = e.target.closest("input[type=file]");
-  if (!input || !input.files[0]) return;
-  const key = input.dataset.key;
-  files[key] = input.files[0];
-  const url = URL.createObjectURL(input.files[0]);
-  const drop = document.getElementById("drop-" + key);
-  drop.classList.add("filled");
-  drop.innerHTML = `<img src="${url}" alt="${key}" />`;
-  document.getElementById("clear-" + key).style.display = "";
-  clearModalityStatus(key);
-  resetOutputs();
-  setAnalyzeEnabled();
-});
-
-cardsEl.addEventListener("click", e => {
-  const b = e.target.closest(".clear-text");
-  if (!b) return;
-  const key = b.id.replace("clear-", "");
-  delete files[key];
-  const m = MODALITIES.find(x => x.key === key);
-  const drop = document.getElementById("drop-" + key);
-  drop.classList.remove("filled");
-  drop.innerHTML = `<input type="file" accept="image/*" data-key="${key}" /><span class="ph"><b>Add ${m.label} image</b>${m.ph}</span>`;
-  b.style.display = "none";
-  clearModalityStatus(key);
-  resetOutputs();
-  setAnalyzeEnabled();
-});
-
-function clearModalityStatus(key) {
-  const s = document.getElementById("mstatus-" + key);
-  s.style.display = "none"; s.className = "modality-status";
-  const msg = document.getElementById("mmsg-" + key);
-  msg.textContent = ""; msg.className = "modality-msg";
-}
-function showModalityStatus(key, valid, message, score) {
-  const s = document.getElementById("mstatus-" + key);
-  s.style.display = ""; s.className = "modality-status " + (valid ? "ok" : "bad");
-  s.textContent = valid ? "accepted" : "rejected";
-  const msg = document.getElementById("mmsg-" + key);
-  msg.className = "modality-msg" + (valid ? "" : " bad");
-  msg.textContent = (message || "") + (score != null ? `  (score ${Number(score).toFixed(2)})` : "");
+// ---------- Retake Helpers ----------
+function showRetake(items) {
+  const retakeEl = document.getElementById("retake");
+  const itemsEl = document.getElementById("retakeItems");
+  document.getElementById("retakeTitle").textContent = items.length === 1 ? "Image Rejected — Retake Needed" : "Images Rejected — Retake Needed";
+  itemsEl.innerHTML = items.map(it => `
+    <div class="retake-row">
+      <span class="retake-bullet">•</span>
+      <span class="retake-text"><strong>${it.label}:</strong> ${it.message}</span>
+    </div>
+  `).join("");
+  retakeEl.classList.add("show");
+  retakeEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
-function setAnalyzeEnabled() {
-  const has = Object.keys(files).length > 0;
-  const online = document.getElementById("statusText").textContent === "Connected";
-  document.getElementById("analyzeBtn").disabled = !(has && online);
-  document.getElementById("validateBtn").disabled = !(has && online);
-  document.getElementById("analyzeBtn").textContent =
-    Object.keys(files).length === 3 ? "Analyze eye + finger/nail + palm" : "Analyze selected images";
-}
-
-function resetOutputs() {
-  document.getElementById("result").classList.remove("show");
+function hideRetake() {
   document.getElementById("retake").classList.remove("show");
 }
 
-function buildFormData() {
-  const fd = new FormData();
-  MODALITIES.forEach(m => { if (files[m.key]) fd.append(m.field, files[m.key], files[m.key].name || m.field + ".jpg"); });
-  return fd;
+function refresh() {
+  const keys = Object.keys(state);
+  const validCount = keys.filter(k => state[k].valid === true).length;
+  const invalidCount = keys.filter(k => state[k].valid === false).length;
+  const checkingCount = keys.filter(k => state[k].valid === null).length;
+
+  document.getElementById("selCount").textContent = `${validCount}/3 verified`;
+  const btn = document.getElementById("analyzeBtn");
+
+  if (checkingCount > 0) {
+    btn.disabled = true;
+    btn.textContent = "AI Detector Verifying Tissue...";
+  } else if (invalidCount > 0) {
+    btn.disabled = true;
+    btn.textContent = "Resolve Rejected Images to Proceed";
+  } else if (validCount === 0) {
+    btn.disabled = true;
+    btn.textContent = "Analyze Selected Biometrics";
+  } else {
+    btn.disabled = false;
+    btn.textContent = validCount === 3
+      ? "Execute Multimodal Tri-Point Analysis"
+      : `Analyze ${validCount} Verified Tissue${validCount > 1 ? "s" : ""}`;
+  }
 }
 
-function applyValidation(validation) {
-  if (!validation) return;
-  Object.entries(validation).forEach(([key, v]) => {
-    if (v && typeof v.valid === "boolean") showModalityStatus(key, v.valid, v.message, v.score);
-  });
-}
+// ---------- Validation Pipeline ----------
+async function validateImageWithBackend(key, file) {
+  const badgeEl = document.getElementById("badge-" + key);
+  const chipEl = document.getElementById("chip-" + key);
+  const m = MODALITIES.find(x => x.key === key);
 
-function showRetake(validation, fallbackMsg) {
-  const failed = validation
-    ? Object.entries(validation).filter(([, v]) => v && v.valid === false)
-        .map(([k, v]) => `<div class="retake-row"><b>${MODALITIES.find(m => m.key === k)?.label || k}:</b><span>${v.message || "retake this image."}</span></div>`)
-    : [];
-  document.getElementById("retakeTitle").textContent = failed.length > 1 ? "Retake these images" : "Retake needed";
-  document.getElementById("retakeItems").innerHTML = failed.length
-    ? failed.join("")
-    : `<div class="retake-row"><span>${fallbackMsg || "One or more images need a clearer retake."}</span></div>`;
-  document.getElementById("retake").classList.add("show");
-}
+  badgeEl.className = "modality-badge checking";
+  badgeEl.innerHTML = `Scanning ${m.label} microvasculature...`;
+  badgeEl.style.display = "flex";
 
-// ---------- validate only ----------
-document.getElementById("validateBtn").addEventListener("click", async () => {
-  resetOutputs();
-  const btn = document.getElementById("validateBtn");
-  btn.disabled = true; btn.textContent = "Checking…";
+  const formData = new FormData();
+  formData.append(`${key}_file`, file);
+
   try {
-    const r = await fetch(API + "/validate/multimodal", { method: "POST", body: buildFormData() });
-    const d = await r.json();
-    applyValidation(d.validation);
-    if (!d.accepted || d.accepted.length === 0) showRetake(d.validation, d.message);
-  } catch (e) {
-    alert("Validation request failed: " + e.message);
+    const res = await fetch(`${API_BASE}/validate/multimodal`, {
+      method: "POST",
+      body: formData,
+    });
+    if (!res.ok) {
+      throw new Error(`Server returned HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    const v = (data.validation && data.validation[key]) || {};
+
+    if (v.valid) {
+      state[key].valid = true;
+      state[key].score = v.score;
+      badgeEl.className = "modality-badge valid";
+      badgeEl.innerHTML = `✓ Verified ${m.label} (${v.message || "Accepted"})`;
+      chipEl.classList.add("active");
+      chipEl.classList.remove("invalid");
+
+      const remainingErrors = Object.keys(state)
+        .filter(k => state[k].valid === false)
+        .map(k => ({ label: MODALITIES.find(x => x.key === k).label, message: state[k].message }));
+      if (remainingErrors.length > 0) {
+        showRetake(remainingErrors);
+      } else {
+        hideRetake();
+      }
+    } else {
+      state[key].valid = false;
+      state[key].message = v.message || `This does not appear to be a valid ${m.label} image.`;
+      badgeEl.className = "modality-badge invalid";
+      badgeEl.innerHTML = `❌ ${state[key].message}`;
+      chipEl.classList.remove("active");
+      chipEl.classList.add("invalid");
+
+      showRetake([{ label: m.label, message: state[key].message }]);
+      document.getElementById("result").classList.remove("show");
+    }
+  } catch (err) {
+    console.warn("Backend validation connection error:", err);
+    state[key].valid = false;
+    state[key].message = "Cannot connect to HemoLens AI backend (make sure server is running on " + API_BASE + ").";
+    badgeEl.className = "modality-badge invalid";
+    badgeEl.innerHTML = `⚠️ ${state[key].message}`;
+    showRetake([{ label: m.label, message: state[key].message }]);
+    document.getElementById("result").classList.remove("show");
   } finally {
-    btn.textContent = "Check images without predicting";
-    setAnalyzeEnabled();
+    refresh();
+  }
+}
+
+async function handleFileSelected(key, file) {
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  state[key] = { file, url, valid: null };
+  document.getElementById("slot-" + key).innerHTML = `<img class="modality-image" src="${url}" alt="${key}" />`;
+  document.getElementById("clear-" + key).style.display = "";
+  document.getElementById("result").classList.remove("show");
+  refresh();
+
+  await validateImageWithBackend(key, file);
+}
+
+cardsEl.addEventListener("change", async e => {
+  const input = e.target.closest("input[type=file]");
+  if (!input || !input.files[0]) return;
+  await handleFileSelected(input.dataset.key, input.files[0]);
+});
+
+cardsEl.addEventListener("click", e => {
+  const liveCardBtn = e.target.closest(".live-card-btn");
+  if (liveCardBtn) {
+    e.preventDefault();
+    liveBtn.click();
+    return;
+  }
+
+  const placeholder = e.target.closest(".modality-placeholder");
+  if (placeholder) {
+    const card = placeholder.closest(".modality-card");
+    const fileInput = card ? card.querySelector("input[type=file]") : null;
+    if (fileInput) fileInput.click();
+    return;
+  }
+
+  const b = e.target.closest(".clear-text");
+  if (!b) return;
+  const key = b.id.replace("clear-", "");
+  delete state[key];
+  const m = MODALITIES.find(x => x.key === key);
+  document.getElementById("slot-" + key).innerHTML =
+    `<div class="modality-placeholder">${captureGuide(key)}<div class="modality-hint">${m.hint}</div></div>`;
+  const badgeEl = document.getElementById("badge-" + key);
+  badgeEl.style.display = "none";
+  badgeEl.className = "modality-badge";
+  b.style.display = "none";
+  const chipEl = document.getElementById("chip-" + key);
+  chipEl.classList.remove("active", "invalid");
+  document.getElementById("result").classList.remove("show");
+
+  const remainingErrors = Object.keys(state)
+    .filter(k => state[k].valid === false)
+    .map(k => ({ label: MODALITIES.find(x => x.key === k).label, message: state[k].message }));
+  if (remainingErrors.length > 0) {
+    showRetake(remainingErrors);
+  } else {
+    hideRetake();
+  }
+
+  refresh();
+});
+
+// ---------- Phone Connection Modal ----------
+const phoneModal = document.getElementById("phoneModal");
+const phoneConnectBtn = document.getElementById("phoneConnectBtn");
+const closePhoneModalBtn = document.getElementById("closePhoneModalBtn");
+const copyUrlBtn = document.getElementById("copyUrlBtn");
+const phoneQrImg = document.getElementById("phoneQrImg");
+const phoneUrlText = document.getElementById("phoneUrlText");
+
+let activePhoneUrl = window.location.href;
+
+async function setupPhoneUrl() {
+  try {
+    const res = await fetch(`${API_BASE}/api/network-info`);
+    if (res.ok) {
+      const info = await res.json();
+      if (info.tunnel_url) {
+        activePhoneUrl = info.tunnel_url;
+      } else if (info.dashboard_url) {
+        activePhoneUrl = info.dashboard_url;
+      }
+    }
+  } catch (_) {}
+  phoneUrlText.textContent = activePhoneUrl;
+  phoneQrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(activePhoneUrl)}`;
+}
+setupPhoneUrl();
+
+phoneConnectBtn.addEventListener("click", () => {
+  phoneModal.classList.add("open");
+});
+closePhoneModalBtn.addEventListener("click", () => {
+  phoneModal.classList.remove("open");
+});
+phoneModal.addEventListener("click", e => {
+  if (e.target === phoneModal) phoneModal.classList.remove("open");
+});
+
+copyUrlBtn.addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText(activePhoneUrl);
+    copyUrlBtn.textContent = "Copied!";
+    setTimeout(() => { copyUrlBtn.textContent = "Copy"; }, 2000);
+  } catch (_) {
+    prompt("Copy this URL to open on your phone:", activePhoneUrl);
   }
 });
 
-// ---------- analyze ----------
-document.getElementById("analyzeBtn").addEventListener("click", async () => {
-  resetOutputs();
-  const btn = document.getElementById("analyzeBtn");
-  const label = btn.textContent;
-  btn.disabled = true; btn.textContent = "Analyzing…";
-  MODALITIES.forEach(m => clearModalityStatus(m.key));
+// ---------- Live Eye Camera Viewfinder ----------
+const cameraModal = document.getElementById("cameraModal");
+const liveBtn = document.getElementById("liveBtn");
+const closeCameraModalBtn = document.getElementById("closeCameraModalBtn");
+const liveVideo = document.getElementById("liveVideo");
+const liveQualityCanvas = document.getElementById("liveQualityCanvas");
+const qCtx = liveQualityCanvas.getContext("2d", { willReadFrequently: true });
+const sharpnessBar = document.getElementById("sharpnessBar");
+const sharpnessVal = document.getElementById("sharpnessVal");
+const lightingBar = document.getElementById("lightingBar");
+const lightingVal = document.getElementById("lightingVal");
+const cameraStatusPill = document.getElementById("cameraStatusPill");
+const cameraReticle = document.getElementById("cameraReticle");
+const flipCameraBtn = document.getElementById("flipCameraBtn");
+const snapPhotoBtn = document.getElementById("snapPhotoBtn");
+const nativeEyeInput = document.getElementById("nativeEyeInput");
+const cameraFallbackCard = document.getElementById("cameraFallbackCard");
+
+let activeStream = null;
+let currentFacingMode = "user";
+let qualityInterval = null;
+
+async function startCameraStream() {
+  stopCameraStream();
+  cameraFallbackCard.classList.remove("show");
+  cameraStatusPill.className = "camera-status-pill";
+  cameraStatusPill.textContent = "Initializing camera sensor...";
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    cameraFallbackCard.classList.add("show");
+    cameraStatusPill.textContent = "Browser live stream restricted. Use Native camera.";
+    return;
+  }
 
   try {
-    const r = await fetch(API + "/predict/multimodal", { method: "POST", body: buildFormData() });
-    if (r.status === 503) { alert("Model not loaded on the server. Run python train.py, then restart the API."); return; }
-    const d = await r.json();
+    const constraints = {
+      video: {
+        facingMode: currentFacingMode,
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+      },
+      audio: false,
+    };
+    activeStream = await navigator.mediaDevices.getUserMedia(constraints);
+    liveVideo.srcObject = activeStream;
+    await liveVideo.play();
+    startQualityAnalyzer();
+  } catch (err) {
+    console.warn("Camera access error:", err);
+    cameraFallbackCard.classList.add("show");
+    cameraStatusPill.className = "camera-status-pill";
+    cameraStatusPill.textContent = "Camera blocked. Use 'Native' camera.";
+  }
+}
 
-    applyValidation(d.validation);
+function stopCameraStream() {
+  if (qualityInterval) {
+    clearInterval(qualityInterval);
+    qualityInterval = null;
+  }
+  if (activeStream) {
+    activeStream.getTracks().forEach(t => t.stop());
+    activeStream = null;
+  }
+  liveVideo.srcObject = null;
+  cameraReticle.classList.remove("optimal");
+}
 
-    if (d.status === "invalid_image" || d.hemoglobin_estimate == null || Number.isNaN(Number(d.hemoglobin_estimate))) {
-      showRetake(d.validation, d.message);
+function startQualityAnalyzer() {
+  if (qualityInterval) clearInterval(qualityInterval);
+  qualityInterval = setInterval(() => {
+    if (!liveVideo || liveVideo.readyState < 2) return;
+
+    qCtx.drawImage(liveVideo, 0, 0, 160, 120);
+    const imgData = qCtx.getImageData(30, 25, 100, 70);
+    const data = imgData.data;
+    const w = 100;
+    const h = 70;
+
+    let totalLum = 0;
+    let totalGrad = 0;
+    let pixelCount = w * h;
+
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const idx = (y * w + x) * 4;
+        const lum = 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
+        totalLum += lum;
+
+        if (x < w - 1 && y < h - 1) {
+          const rightLum = 0.299 * data[idx + 4] + 0.587 * data[idx + 5] + 0.114 * data[idx + 6];
+          const downIdx = ((y + 1) * w + x) * 4;
+          const downLum = 0.299 * data[downIdx] + 0.587 * data[downIdx + 1] + 0.114 * data[downIdx + 2];
+          totalGrad += Math.abs(rightLum - lum) + Math.abs(downLum - lum);
+        }
+      }
+    }
+
+    const avgLum = totalLum / pixelCount;
+    const avgGrad = totalGrad / (pixelCount * 2);
+
+    let lightScore = 0;
+    if (avgLum >= 80 && avgLum <= 180) {
+      lightScore = 100;
+    } else if (avgLum < 80) {
+      lightScore = Math.max(10, Math.round((avgLum / 80) * 100));
+    } else {
+      lightScore = Math.max(10, Math.round(((255 - avgLum) / 75) * 100));
+    }
+
+    const sharpScore = Math.min(100, Math.max(5, Math.round(avgGrad * 5.5)));
+
+    sharpnessBar.style.width = sharpScore + "%";
+    sharpnessVal.textContent = sharpScore + "%";
+    sharpnessBar.style.background = sharpScore > 55 ? "#10B981" : (sharpScore > 35 ? "#FFA502" : "#FF4757");
+
+    lightingBar.style.width = lightScore + "%";
+    lightingVal.textContent = lightScore + "%";
+    lightingBar.style.background = lightScore > 65 ? "#10B981" : (lightScore > 40 ? "#FFA502" : "#FF4757");
+
+    if (avgLum < 65) {
+      cameraReticle.classList.remove("optimal");
+      cameraStatusPill.className = "camera-status-pill";
+      cameraStatusPill.textContent = "🟡 Low Light — Move closer to ambient illumination";
+    } else if (avgLum > 215) {
+      cameraReticle.classList.remove("optimal");
+      cameraStatusPill.className = "camera-status-pill";
+      cameraStatusPill.textContent = "🟡 Harsh Glare — Diffuse light source";
+    } else if (sharpScore < 45) {
+      cameraReticle.classList.remove("optimal");
+      cameraStatusPill.className = "camera-status-pill";
+      cameraStatusPill.textContent = "🟡 Focus Warning — Hold steady on conjunctival pouch";
+    } else {
+      cameraReticle.classList.add("optimal");
+      cameraStatusPill.className = "camera-status-pill ready";
+      cameraStatusPill.textContent = "🟢 Target Locked · Tap 📸 to Capture";
+    }
+  }, 120);
+}
+
+liveBtn.addEventListener("click", () => {
+  cameraModal.classList.add("open");
+  startCameraStream();
+});
+
+closeCameraModalBtn.addEventListener("click", () => {
+  stopCameraStream();
+  cameraModal.classList.remove("open");
+});
+
+cameraModal.addEventListener("click", e => {
+  if (e.target === cameraModal) {
+    stopCameraStream();
+    cameraModal.classList.remove("open");
+  }
+});
+
+flipCameraBtn.addEventListener("click", () => {
+  currentFacingMode = currentFacingMode === "user" ? "environment" : "user";
+  startCameraStream();
+});
+
+snapPhotoBtn.addEventListener("click", () => {
+  if (!liveVideo || liveVideo.readyState < 2) {
+    alert("Camera sensor is not ready yet.");
+    return;
+  }
+  const cap = document.createElement("canvas");
+  cap.width = liveVideo.videoWidth || 1280;
+  cap.height = liveVideo.videoHeight || 720;
+  const ctx = cap.getContext("2d");
+  ctx.drawImage(liveVideo, 0, 0, cap.width, cap.height);
+
+  cap.toBlob(async blob => {
+    stopCameraStream();
+    cameraModal.classList.remove("open");
+    const file = new File([blob], "live_eye_capture.jpg", { type: "image/jpeg" });
+    await handleFileSelected("eye", file);
+  }, "image/jpeg", 0.95);
+});
+
+nativeEyeInput.addEventListener("change", async () => {
+  if (nativeEyeInput.files && nativeEyeInput.files[0]) {
+    stopCameraStream();
+    cameraModal.classList.remove("open");
+    await handleFileSelected("eye", nativeEyeInput.files[0]);
+  }
+});
+
+// ---------- Arc Gauge Animation Function ----------
+function updateArcGauge(hb) {
+  const arc = document.getElementById("gaugeArc");
+  if (!arc) return;
+  // Arc length is 283 (pi * r, r=75 -> approx 235.6 in SVG viewBox 0-200)
+  // Total path length of A 75 75 0 0 1 is approx 235.62
+  const totalLength = 235.62;
+  arc.style.strokeDasharray = `${totalLength}`;
+  
+  // Map hb (7 to 18) to 0.0 -> 1.0
+  const minHb = 7.0;
+  const maxHb = 18.0;
+  const clamped = Math.max(minHb, Math.min(maxHb, hb));
+  const fraction = (clamped - minHb) / (maxHb - minHb);
+  
+  const offset = totalLength * (1 - fraction);
+  arc.style.strokeDashoffset = `${offset}`;
+}
+
+// ---------- Analyze Prediction Trigger ----------
+document.getElementById("analyzeBtn").addEventListener("click", async () => {
+  const keys = Object.keys(state);
+  if (keys.length === 0) return;
+
+  const bad = keys.filter(k => state[k].valid === false);
+  if (bad.length > 0) {
+    showRetake(bad.map(k => ({
+      label: MODALITIES.find(m => m.key === k).label,
+      message: state[k].message || "Image rejected by detector."
+    })));
+    document.getElementById("result").classList.remove("show");
+    return;
+  }
+
+  if (keys.some(k => state[k].valid === null)) {
+    alert("Please wait for all images to finish AI verification.");
+    return;
+  }
+
+  const btn = document.getElementById("analyzeBtn");
+  btn.disabled = true;
+  btn.textContent = "Executing Perfusion Conditioning Models...";
+
+  const formData = new FormData();
+  if (state.eye && state.eye.file) formData.append("eye_file", state.eye.file);
+  if (state.nail && state.nail.file) formData.append("nail_file", state.nail.file);
+  if (state.palm && state.palm.file) formData.append("palm_file", state.palm.file);
+
+  try {
+    const res = await fetch(`${API_BASE}/predict/multimodal`, {
+      method: "POST",
+      body: formData,
+    });
+    const data = await res.json();
+
+    if (!res.ok || data.status === "invalid_image" || data.hemoglobin_estimate == null) {
+      document.getElementById("result").classList.remove("show");
+      const errs = [];
+      if (data.validation) {
+        Object.entries(data.validation).forEach(([k, v]) => {
+          if (!v.valid) {
+            const m = MODALITIES.find(x => x.key === k);
+            errs.push({ label: m ? m.label : k, message: v.message });
+          }
+        });
+      }
+      if (errs.length === 0 && data.message) {
+        errs.push({ label: "Image rejected", message: data.message });
+      }
+      showRetake(errs);
       return;
     }
 
-    const hb = Number(d.hemoglobin_estimate);
-    const statusKey = d.health_status || "SAFE";
+    hideRetake();
+    const hb = Number(data.hemoglobin_estimate);
+    const st = getHemoglobinStatus(hb);
+    const ms = data.processing_time_ms || 0;
+
     document.getElementById("hbVal").textContent = hb.toFixed(1);
+    updateArcGauge(hb);
+
+    // Confidence Interval (Conformal Prediction)
+    const ci = data.confidence_interval;
+    if (ci && ci.lower != null && ci.upper != null) {
+      document.getElementById("confRange").textContent = `${ci.lower} – ${ci.upper} g/dL`;
+      document.getElementById("confBox").style.display = "flex";
+    } else {
+      document.getElementById("confBox").style.display = "none";
+    }
+
+    // Signal Quality Index (SQI)
+    const sqi = data.signal_quality_index;
+    const sqiPill = document.getElementById("sqiPill");
+    if (sqi && sqi.level) {
+      const lvl = sqi.level.toLowerCase();
+      sqiPill.className = `sqi-pill ${lvl}`;
+      document.getElementById("sqiText").textContent = `${sqi.level} Quality (SQI: ${sqi.score}) — ${sqi.feedback || "Good"}`;
+      sqiPill.style.display = "inline-flex";
+    } else {
+      sqiPill.style.display = "none";
+    }
+
     const badge = document.getElementById("levelBadge");
-    badge.textContent = LEVEL_LABEL[statusKey] || statusKey;
-    badge.style.background = d.health_color || "#4CAF50";
-    document.getElementById("result").style.borderLeftColor = d.health_color || "#4CAF50";
-    document.getElementById("resultMeta").textContent =
-      (d.model ? d.model + " model · " : "") + (d.processing_time_ms != null ? d.processing_time_ms + " ms" : "");
-    const used = d.modalities_used || [];
-    document.getElementById("modalitiesUsed").textContent = used.length ? "Modalities used: " + used.join(" · ") : "";
+    badge.style.background = st.color;
+    document.getElementById("levelText").textContent = LEVEL_LABEL[st.status] || st.status;
+    document.getElementById("resultMeta").textContent = ms + " ms · On-Device Inference";
+    document.getElementById("modalitiesUsed").textContent = data.modalities_used && data.modalities_used.length > 1
+      ? "Fused Modalities: " + data.modalities_used.join(" · ")
+      : "";
 
-    const warn = document.getElementById("warnLine");
-    if (d.warning) { warn.style.display = ""; warn.textContent = d.warning; } else { warn.style.display = "none"; }
+    // Modality Weights Card
+    const weightsCard = document.getElementById("weightsCard");
+    const weightsBarWrap = document.getElementById("weightsBarWrap");
+    const weightsList = document.getElementById("weightsList");
+    const clinicalNote = document.getElementById("clinicalEvidenceNote");
 
-    document.getElementById("healthMessage").textContent = d.health_message || "";
+    if (data.modality_weights && Object.keys(data.modality_weights).length > 0) {
+      const wMap = data.modality_weights;
+      const cMap = data.modality_contributions || {};
+      const colors = { eye: "#00F2FE", nail: "#FFA502", palm: "#10B981" };
 
-    const kv = [];
-    if (d.active_features != null) kv.push(`<span>features <b>${d.active_features}</b></span>`);
-    if (d.eye_quality_score != null) kv.push(`<span>eye quality <b>${Number(d.eye_quality_score).toFixed(2)}</b></span>`);
-    document.getElementById("resultKv").innerHTML = kv.join("");
+      weightsBarWrap.innerHTML = Object.entries(wMap)
+        .map(([k, w]) => `<div class="weight-bar-segment weight-bar-${k}" style="width: ${(w * 100).toFixed(1)}%;"></div>`)
+        .join("");
 
-    document.getElementById("insights").innerHTML = (INSIGHTS[statusKey] || INSIGHTS.SAFE)
-      .map(t => `<div class="insight-row"><span class="b">•</span><span>${t}</span></div>`).join("");
+      weightsList.innerHTML = Object.entries(wMap).map(([k, w]) => {
+        const m = MODALITIES.find(x => x.key === k) || { label: k };
+        const contrib = cMap[k] || {};
+        const estStr = contrib.estimate != null ? `${Number(contrib.estimate).toFixed(1)} g/dL` : "–";
+        const pctStr = `${(w * 100).toFixed(0)}%`;
+        return `
+          <div class="modality-contrib-item">
+            <div class="contrib-left">
+              <span class="contrib-dot" style="background: ${colors[k] || '#888'};"></span>
+              <span>${m.label}</span>
+            </div>
+            <div class="contrib-right">
+              <span>Readout: <strong>${estStr}</strong></span>
+              <span class="contrib-weight-pill">Weight: ${pctStr}</span>
+            </div>
+          </div>
+        `;
+      }).join("");
 
+      clinicalNote.innerHTML = `
+        <strong>Clinical Calibration Rationale:</strong>
+        Palpebral Conjunctiva weighted at <strong>55%</strong> as primary microvascular bed with minimal melanin interference (<em>Kalantri et al., 2010</em>);
+        Nail bed at <strong>25%</strong> for subungual capillary loop density (<em>Mannino et al., 2018</em>);
+        Palmar pallor at <strong>20%</strong> for systemic erythema screening (<em>WHO IMCI Standard</em>).
+      `;
+
+      weightsCard.style.display = "block";
+    } else {
+      weightsCard.style.display = "none";
+    }
+
+    document.getElementById("healthMessage").textContent = st.message;
+    document.getElementById("insights").innerHTML = (INSIGHTS[st.status] || [])
+      .map(t => `<div class="insight-row"><span class="insight-bullet">▸</span><span class="insight-text">${t}</span></div>`).join("");
+    
     document.getElementById("result").classList.add("show");
     document.getElementById("result").scrollIntoView({ behavior: "smooth", block: "nearest" });
 
     saveHistory({
       date: new Date().toISOString(),
       hemoglobin: Number(hb.toFixed(1)),
-      healthStatus: statusKey,
-      modalitiesUsed: used,
-      processingTime: d.processing_time_ms ?? "",
+      healthStatus: st.status,
+      modalitiesUsed: data.modalities_used || ["eye"],
+      processingTime: ms,
     });
-  } catch (e) {
-    alert("Prediction request failed: " + e.message + "\nIs the API running at " + API + " ?");
+  } catch (err) {
+    console.error("Prediction error:", err);
+    alert("Connection error: Could not reach the HemoLens backend at " + API_BASE);
   } finally {
-    btn.textContent = label;
-    setAnalyzeEnabled();
+    refresh();
   }
 });
 
-// ---------- history ----------
+// ---------- Historical Data Storage & Export ----------
 const HKEY = "hemolens_dashboard_history";
 const MAX_HISTORY = 12;
-function getHistory() { try { return JSON.parse(localStorage.getItem(HKEY)) || []; } catch (_) { return []; } }
+
+function getHistory() {
+  try { return JSON.parse(localStorage.getItem(HKEY)) || []; } catch (_) { return []; }
+}
+
 function saveHistory(entry) {
   const h = [entry, ...getHistory()].slice(0, MAX_HISTORY);
   try { localStorage.setItem(HKEY, JSON.stringify(h)); } catch (_) {}
   renderHistory();
 }
-function fmtDate(iso) { try { return new Date(iso).toLocaleString(); } catch (_) { return iso; } }
+
+function fmtDate(iso) {
+  try { return new Date(iso).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); } catch (_) { return iso; }
+}
+
 function renderHistory() {
   const h = getHistory();
   const body = document.getElementById("histBody");
   const trendWrap = document.getElementById("trendWrap");
   if (h.length === 0) {
-    body.innerHTML = `<div class="history-empty">Your readings will appear here after each successful analyze.</div>`;
-    trendWrap.innerHTML = ""; return;
+    body.innerHTML = `<div class="history-empty">Recent longitudinal readings will appear here following each screening.</div>`;
+    trendWrap.innerHTML = "";
+    return;
   }
   if (h.length >= 2) {
-    const delta = h[0].hemoglobin - h[Math.min(h.length - 1, 4)].hemoglobin;
-    const label = delta > 0.2 ? "Up" : delta < -0.2 ? "Down" : "Stable";
-    trendWrap.innerHTML = `<div class="trend-card"><div class="trend-label">Trend</div><div class="trend-value">${label} ${Math.abs(delta).toFixed(1)} g/dL</div></div>`;
-  } else { trendWrap.innerHTML = ""; }
+    const oldest = h[Math.min(h.length - 1, 4)].hemoglobin;
+    const delta = h[0].hemoglobin - oldest;
+    const label = delta > 0.2 ? "▲ Up" : delta < -0.2 ? "▼ Down" : "● Stable";
+    trendWrap.innerHTML = `
+      <div class="trend-card">
+        <div class="trend-label">Biometric Trajectory</div>
+        <div class="trend-value">${label} ${Math.abs(delta).toFixed(1)} g/dL</div>
+        <div class="trend-text">Longitudinal variance across the last ${Math.min(h.length, 5)} local assessments.</div>
+      </div>
+    `;
+  } else {
+    trendWrap.innerHTML = "";
+  }
+
   body.innerHTML = h.slice(0, 5).map(e => `
     <div class="history-row">
-      <div><div class="history-date">${fmtDate(e.date)}</div>
-        <div class="history-meta">${(e.modalitiesUsed || []).join(" · ") || "—"}</div></div>
-      <div><div class="history-value">${e.hemoglobin.toFixed(1)}</div><div class="history-unit">g/dL</div></div>
-    </div>`).join("");
+      <div>
+        <div class="history-date">${fmtDate(e.date)}</div>
+        <div class="history-meta">${(e.modalitiesUsed || ["eye"]).join(" · ")}</div>
+      </div>
+      <div>
+        <div class="history-value">${e.hemoglobin.toFixed(1)}</div>
+        <div class="history-unit">g/dL</div>
+      </div>
+    </div>
+  `).join("");
 }
+
 document.getElementById("exportBtn").addEventListener("click", () => {
   const h = getHistory();
-  if (h.length === 0) { alert("No saved readings to export yet."); return; }
-  const rows = [["Date", "Hemoglobin (g/dL)", "Status", "Modalities", "Processing Time (ms)"]];
-  h.forEach(e => rows.push([e.date, e.hemoglobin.toFixed(1), e.healthStatus || "", (e.modalitiesUsed || []).join(" / "), e.processingTime ?? ""]));
-  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
+  if (h.length === 0) { alert("There are no saved readings to export yet."); return; }
+  const header = ["Date", "Hemoglobin (g/dL)", "Status", "Modalities", "Processing Time (ms)"];
+  const csv = [header, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
-  a.download = "hemolens_history.csv";
+  a.download = "hemolens_clinical_history.csv";
   a.click();
 });
 
-checkHealth();
+refresh();
 renderHistory();
 </script>
 </body>

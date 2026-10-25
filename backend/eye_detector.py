@@ -1,9 +1,22 @@
 import cv2
 import numpy as np
 from pathlib import Path
+from typing import List, Optional, Tuple
 
 
 class EyeDetector:
+    """Detect whether an image contains a human eye.
+
+    Uses Haar cascades as the primary detector and a multi-signal
+    eye-feature analyser as the fallback.  The fallback checks for
+    sclera, iris/pupil circles, conjunctiva colour and eyelid edges
+    so that non-eye images (landscapes, objects, hands …) are rejected.
+    """
+
+    # Minimum number of secondary signals required to accept an image
+    # when the cascade detector does not fire.
+    MIN_EYE_SIGNALS = 2
+
     def __init__(self):
         self.supports_cascade = bool(
             hasattr(cv2, 'CascadeClassifier')
@@ -28,33 +41,261 @@ class EyeDetector:
                 self.eye_cascade = None
                 self.face_cascade = None
 
-    def _fallback_quality_score(self, image: np.ndarray) -> float:
-        if len(image.shape) == 3:
-            gray = cv2.cvtColor(image.astype(np.uint8), cv2.COLOR_RGB2GRAY)
-            rgb = image.astype(np.uint8)
+    # ------------------------------------------------------------------
+    # Secondary eye-feature signals (used when cascades don't fire)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _detect_sclera(hsv: np.ndarray, image_area: float) -> bool:
+        """Look for a white/near-white region (sclera) via HSV thresholds.
+
+        Sclera is characterised by low saturation and high value.
+        We expect it to occupy roughly 3–30 % of the image in a
+        close-up eye photo, and it must form a coherent region
+        (not random scattered pixels).
+        """
+        mask = cv2.inRange(hsv, (0, 0, 180), (180, 45, 255))
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+        total_white = float((mask > 0).sum())
+        white_fraction = total_white / image_area
+        if not (0.03 <= white_fraction <= 0.35):
+            return False
+
+        # Coherence: largest connected blob must be ≥ 40% of total white area
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if not contours:
+            return False
+        largest = max(cv2.contourArea(c) for c in contours)
+        return largest >= total_white * 0.40
+
+    @staticmethod
+    def _detect_iris_pupil(gray: np.ndarray, hsv: Optional[np.ndarray] = None) -> bool:
+        """Detect circular iris/pupil shapes with HoughCircles.
+        
+        Verifies that detected circles are genuine ocular features rather than
+        uniform bright circular discs (mugs, plates, watches, lights).
+        """
+        h, w = gray.shape[:2]
+        min_dim = min(h, w)
+        min_r = max(int(min_dim * 0.04), 5)
+        max_r = max(int(min_dim * 0.35), min_r + 5)
+
+        blurred = cv2.GaussianBlur(gray, (9, 9), 2)
+        circles = cv2.HoughCircles(
+            blurred,
+            cv2.HOUGH_GRADIENT,
+            dp=1.4,
+            minDist=min_dim // 4,
+            param1=60,
+            param2=35,
+            minRadius=min_r,
+            maxRadius=max_r,
+        )
+        if circles is None:
+            return False
+
+        if hsv is None:
+            white_mask = gray > 200
         else:
-            gray = image.astype(np.uint8)
-            rgb = cv2.cvtColor(gray, cv2.COLOR_GRAY2RGB)
+            white_mask = cv2.inRange(hsv, (0, 0, 180), (180, 45, 255)) > 0
+
+        for c in circles[0]:
+            cx, cy, r = int(c[0]), int(c[1]), int(c[2])
+            mask = np.zeros((h, w), dtype=np.uint8)
+            cv2.circle(mask, (cx, cy), max(2, int(r * 0.85)), 255, -1)
+            pts = mask > 0
+            if pts.sum() == 0:
+                continue
+            white_frac = float((white_mask[pts] > 0).mean())
+            mean_gray = float(gray[pts].mean())
+            # Human irises are pigmented and have pupil aperture; they are NOT solid white discs
+            if white_frac > 0.35 or mean_gray > 215:
+                continue
+            # Circle interior must have texture / contrast (not flat solid disc)
+            if float(gray[pts].std()) < 6.0:
+                continue
+            return True
+
+        return False
+
+    @staticmethod
+    def _check_periorbital_skin(rgb: np.ndarray) -> bool:
+        """Check for human facial/periorbital skin tissue around the eye."""
+        ycrcb = cv2.cvtColor(rgb, cv2.COLOR_RGB2YCrCb)
+        mask_ycrcb = cv2.inRange(ycrcb, (0, 133, 77), (255, 175, 127))
+        hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)
+        mask_hsv = cv2.inRange(hsv, (0, 15, 30), (25, 200, 255))
+        r = rgb[:, :, 0].astype(np.int16)
+        g = rgb[:, :, 1].astype(np.int16)
+        b = rgb[:, :, 2].astype(np.int16)
+        rgb_rule = (r >= g) & (g >= b) & (r - b > 10)
+        mask = mask_ycrcb & mask_hsv & rgb_rule
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+        mask = cv2.morphologyEx(mask.astype(np.uint8), cv2.MORPH_OPEN, kernel)
+        total = int((mask > 0).sum())
+        frac = float(total) / float(rgb.shape[0] * rgb.shape[1] + 1e-6)
+        if frac < 0.03:
+            return False
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if not contours:
+            return False
+        largest = max(cv2.contourArea(c) for c in contours)
+        return largest >= total * 0.35
+
+    @staticmethod
+    def _check_conjunctiva_color(rgb: np.ndarray) -> bool:
+        """Check whether the image contains pinkish-red tissue (conjunctiva).
+
+        Conjunctiva tissue sits in a specific hue range (roughly 0–20 or
+        160–180 in OpenCV HSV) and has moderate-to-high saturation with
+        a reddish R-channel dominance.  The region must be spatially
+        coherent (not scattered noise pixels).
+        """
+        hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)
+        # Pinkish-red hues wrap around 0 in HSV
+        mask_low = cv2.inRange(hsv, (0, 40, 80), (18, 200, 255))
+        mask_high = cv2.inRange(hsv, (160, 40, 80), (180, 200, 255))
+        mask = cv2.bitwise_or(mask_low, mask_high)
+
+        # Morphological cleanup
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+
+        total_pink = float((mask > 0).sum())
+        image_area = float(rgb.shape[0] * rgb.shape[1])
+        pink_fraction = total_pink / image_area
+
+        # Conjunctiva close-ups typically have 4-60 % pinkish-red area
+        if not (0.04 <= pink_fraction <= 0.65):
+            return False
+
+        # Coherence: largest connected blob must be ≥ 30% of total pink area
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if not contours:
+            return False
+        largest = max(cv2.contourArea(c) for c in contours)
+        return largest >= total_pink * 0.30
+
+    @staticmethod
+    def _detect_eyelid_edges(gray: np.ndarray) -> bool:
+        """Look for strong horizontal curved edges (eyelid margins).
+
+        Eyelids produce dominant horizontal edges in the image.
+        We check that horizontal Sobel energy clearly exceeds vertical
+        Sobel energy and that edge density is in a realistic range
+        (too high = noise, too low = no edges at all).
+        """
+        sobel_h = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=3)
+        sobel_v = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=3)
+        h_energy = float(np.abs(sobel_h).mean())
+        v_energy = float(np.abs(sobel_v).mean())
+        edge_density = float((np.abs(sobel_h) > 30).mean())
+        # Real eyelid images have:
+        # - meaningful horizontal edge density (0.05 - 0.55)
+        # - horizontal energy clearly exceeding vertical (1.2x ratio)
+        return (
+            h_energy > 12.0
+            and 0.05 <= edge_density <= 0.55
+            and h_energy > v_energy * 1.2
+        )
+
+    # ------------------------------------------------------------------
+    # Orchestrator — combine signals with anatomical rules
+    # ------------------------------------------------------------------
+
+    def _detect_eye_features(self, image: np.ndarray) -> tuple:
+        """Run secondary eye-feature checks.
+
+        Returns (is_eye: bool, signal_count: int, signal_names: list[str]).
+        An image is accepted only when it exhibits genuine ocular/facial
+        tissue and matches either the palpebral conjunctiva pattern or an
+        open-eye anatomical structure.
+        """
+        rgb = image.astype(np.uint8)
+        if len(rgb.shape) == 2:
+            rgb = cv2.cvtColor(rgb, cv2.COLOR_GRAY2RGB)
+
+        gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
+        hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)
+        image_area = float(gray.shape[0] * gray.shape[1])
+
+        signals: list[str] = []
+
+        has_sclera = self._detect_sclera(hsv, image_area)
+        if has_sclera:
+            signals.append("sclera")
+
+        has_iris = self._detect_iris_pupil(gray, hsv)
+        if has_iris:
+            signals.append("iris_pupil")
+
+        has_conjunctiva = self._check_conjunctiva_color(rgb)
+        if has_conjunctiva:
+            signals.append("conjunctiva_color")
+
+        has_skin = self._check_periorbital_skin(rgb)
+        if has_skin:
+            signals.append("periorbital_skin")
+
+        has_eyelids = self._detect_eyelid_edges(gray)
+        if has_eyelids and (has_skin or has_conjunctiva):
+            signals.append("eyelid_edges")
+
+        # Biological tissue requirement: must contain either mucosal conjunctiva
+        # or human periorbital/facial skin. Everyday inanimate objects (mugs, plates,
+        # watches, headlights) have neither.
+        has_bio_tissue = has_conjunctiva or has_skin
+
+        # Eye structural pattern:
+        # Route A: Palpebral conjunctiva close-up (clinical anemia capture)
+        #   Target mucosal tissue + supporting ocular structure (sclera or iris)
+        route_a = has_conjunctiva and (has_sclera or has_iris)
+
+        # Route B: Open eye close-up
+        #   Iris/pupil + flanking sclera + surrounding facial/eyelid skin
+        route_b = has_iris and has_sclera and has_skin
+
+        is_eye = has_bio_tissue and (route_a or route_b)
+        return is_eye, len(signals), signals
+
+    # ------------------------------------------------------------------
+    # Quality score (meaningful only when eye features are present)
+    # ------------------------------------------------------------------
+
+    def _compute_eye_quality(self, image: np.ndarray) -> float:
+        """Return a quality score in [0, 1].
+
+        Returns 0.0 when no eye features are detected.  When eye
+        features *are* detected the score captures brightness, focus
+        and signal strength.
+        """
+        is_eye, signal_count, _ = self._detect_eye_features(image)
+        if not is_eye:
+            return 0.0
+
+        rgb = image.astype(np.uint8)
+        if len(rgb.shape) == 2:
+            gray = rgb
+        else:
+            gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
 
         brightness = float(gray.mean())
         blur = float(cv2.Laplacian(gray, cv2.CV_64F).var())
-        hist = cv2.calcHist([gray], [0], None, [256], [0, 256]).flatten()
-        hist = hist / (hist.sum() + 1e-8)
-        entropy = float(-np.sum(hist[hist > 0] * np.log2(hist[hist > 0] + 1e-8)))
-
-        ycrcb = cv2.cvtColor(rgb, cv2.COLOR_RGB2YCrCb)
-        skin_mask = cv2.inRange(ycrcb, (0, 133, 77), (255, 173, 127))
-        skin_fraction = float((skin_mask > 0).mean())
 
         brightness_score = 1.0 - min(abs(brightness - 120.0) / 120.0, 1.0)
         blur_score = min(blur / 120.0, 1.0)
-        entropy_score = min(entropy / 6.0, 1.0)
-        skin_score = min(max(skin_fraction, 0.02) / 0.18, 1.0)
+        signal_score = min(signal_count / 4.0, 1.0)
 
-        return float(max(0.0, min(1.0, 0.30 * brightness_score + 0.25 * blur_score + 0.20 * entropy_score + 0.25 * skin_score)))
+        return float(max(0.0, min(1.0,
+            0.30 * brightness_score + 0.30 * blur_score + 0.40 * signal_score
+        )))
 
-    def _fallback_detect_eyes(self, image: np.ndarray) -> bool:
-        return self._fallback_quality_score(image) >= 0.40
+    # ------------------------------------------------------------------
+    # Cascade helpers (unchanged from original)
+    # ------------------------------------------------------------------
 
     def _eyes_look_plausible(self, face_box, eye_boxes) -> bool:
         if face_box is None or len(eye_boxes) < 2:
@@ -121,47 +362,56 @@ class EyeDetector:
 
         return best_face, best_eyes
 
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
     def detect_eyes(self, image: np.ndarray) -> bool:
-        if not self.supports_cascade or self.eye_cascade is None or self.face_cascade is None:
-            return self._fallback_detect_eyes(image)
+        """Return True only if the image plausibly contains a human eye."""
+        # Try cascade first
+        if self.supports_cascade and self.eye_cascade is not None and self.face_cascade is not None:
+            if len(image.shape) == 3:
+                gray = cv2.cvtColor(image.astype(np.uint8), cv2.COLOR_RGB2GRAY)
+            else:
+                gray = image.astype(np.uint8)
 
-        if len(image.shape) == 3:
-            gray = cv2.cvtColor(image.astype(np.uint8), cv2.COLOR_RGB2GRAY)
-        else:
-            gray = image.astype(np.uint8)
+            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+            enhanced = clahe.apply(gray)
+            face_box, eyes = self._best_face_and_eyes(enhanced)
+            if face_box is not None and len(eyes) >= 2:
+                return True
 
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-        enhanced = clahe.apply(gray)
-        face_box, eyes = self._best_face_and_eyes(enhanced)
-        if face_box is not None and len(eyes) >= 2:
-            return True
-        return self._fallback_detect_eyes(image)
+        # Cascade failed — use multi-signal fallback (NOT generic quality)
+        is_eye, _, _ = self._detect_eye_features(image)
+        return is_eye
 
     def get_eye_quality_score(self, image: np.ndarray) -> float:
-        if not self.supports_cascade or self.eye_cascade is None or self.face_cascade is None:
-            return self._fallback_quality_score(image)
+        """Return eye quality score.  0.0 when no eye features detected."""
+        if self.supports_cascade and self.eye_cascade is not None and self.face_cascade is not None:
+            if len(image.shape) == 3:
+                gray = cv2.cvtColor(image.astype(np.uint8), cv2.COLOR_RGB2GRAY)
+            else:
+                gray = image.astype(np.uint8)
 
-        if len(image.shape) == 3:
-            gray = cv2.cvtColor(image.astype(np.uint8), cv2.COLOR_RGB2GRAY)
-        else:
-            gray = image.astype(np.uint8)
+            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+            enhanced = clahe.apply(gray)
 
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-        enhanced = clahe.apply(gray)
+            face_box, eyes = self._best_face_and_eyes(enhanced)
+            if face_box is not None and len(eyes) >= 2:
+                face_w = float(face_box[2])
+                face_h = float(face_box[3])
+                image_area = float(gray.shape[0] * gray.shape[1] + 1e-6)
+                face_area_ratio = float(face_box[2] * face_box[3]) / image_area
+                eye_strength = min(len(eyes) / 2.0, 1.0)
+                size_strength = min(face_area_ratio / 0.22, 1.0)
+                aspect_strength = 1.0 - min(abs((face_w / (face_h + 1e-6)) - 1.0), 0.6)
 
-        face_box, eyes = self._best_face_and_eyes(enhanced)
-        if face_box is None or len(eyes) < 2:
-            return self._fallback_quality_score(image)
+                return float(max(0.0, min(1.0,
+                    0.45 * eye_strength + 0.35 * size_strength + 0.20 * aspect_strength
+                )))
 
-        face_w = float(face_box[2])
-        face_h = float(face_box[3])
-        image_area = float(gray.shape[0] * gray.shape[1] + 1e-6)
-        face_area_ratio = float(face_box[2] * face_box[3]) / image_area
-        eye_strength = min(len(eyes) / 2.0, 1.0)
-        size_strength = min(face_area_ratio / 0.22, 1.0)
-        aspect_strength = 1.0 - min(abs((face_w / (face_h + 1e-6)) - 1.0), 0.6)
-
-        return float(max(0.0, min(1.0, 0.45 * eye_strength + 0.35 * size_strength + 0.20 * aspect_strength)))
+        # No cascade hit — use secondary feature quality
+        return self._compute_eye_quality(image)
 
 
 def get_hemoglobin_status(value: float) -> dict:
