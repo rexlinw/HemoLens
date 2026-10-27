@@ -106,6 +106,22 @@ def _notebook_paper():
     return _add_texture(img)
 
 
+def _apple_on_desk():
+    """Spherical red object on desk (apple)."""
+    img = np.full((300, 300, 3), 240, dtype=np.uint8)
+    cv2.circle(img, (150, 150), 75, (190, 35, 30), -1)
+    return _add_texture(img)
+
+
+def _fruit_basket():
+    """Red apple, yellow banana, and green lime on table."""
+    img = np.full((300, 300, 3), 235, dtype=np.uint8)
+    cv2.circle(img, (90, 120), 55, (190, 30, 25), -1)   # red apple
+    cv2.circle(img, (210, 120), 45, (40, 175, 45), -1)  # green lime
+    cv2.ellipse(img, (150, 220), (80, 25), 15, 0, 360, (230, 205, 30), -1) # yellow banana
+    return _add_texture(img)
+
+
 # ---------------------------------------------------------------------------
 # Test: reject synthetic non-eye images
 # ---------------------------------------------------------------------------
@@ -128,6 +144,8 @@ class TestRejectsNonEyeImages:
         (_plate(), "dinner plate"),
         (_car_headlight(), "car headlight"),
         (_notebook_paper(), "ruled notebook paper"),
+        (_apple_on_desk(), "apple on desk"),
+        (_fruit_basket(), "fruit basket"),
     ])
     def test_detect_eyes_returns_false(self, image, description):
         result = self.detector.detect_eyes(image)
@@ -145,6 +163,8 @@ class TestRejectsNonEyeImages:
         (_plate(), "dinner plate"),
         (_car_headlight(), "car headlight"),
         (_notebook_paper(), "ruled notebook paper"),
+        (_apple_on_desk(), "apple on desk"),
+        (_fruit_basket(), "fruit basket"),
     ])
     def test_validate_eye_rejects(self, image, description):
         result = validate_eye(image, self.detector)

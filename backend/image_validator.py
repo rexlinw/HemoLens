@@ -135,8 +135,27 @@ def validate_eye(image: np.ndarray, eye_detector: EyeDetector) -> ValidationResu
     if basic:
         return ValidationResult(False, 0.0, basic)
 
+    # Reject non-biological color pollution (fruit, foliage, cyan/neon graphics)
+    if hasattr(eye_detector, "_has_unnatural_colors") and eye_detector._has_unnatural_colors(rgb):
+        return ValidationResult(
+            False,
+            0.0,
+            "This image contains non-biological colors (fruit, foliage, or graphic overlay) and is not an eye. Please upload a clear eye or conjunctiva capture."
+        )
+
     # ---- Step 1: check for eye features (multi-signal) ----
     has_features = _has_eye_features(rgb, eye_detector)
+
+    # Reject non-eye skin images (e.g. a palm or hand dropped into the eye slot)
+    skin_frac = _skin_fraction(rgb)
+    if skin_frac > 0.35 and not has_features:
+        return ValidationResult(
+            False,
+            0.0,
+            "This looks like a hand, palm or plain-skin photo, not an eye. "
+            "Capture a close-up of the eye, or pull down the lower eyelid so the "
+            "white of the eye or the pink inner lid is clearly visible."
+        )
 
     if not has_features:
         # Last resort: try cascade path

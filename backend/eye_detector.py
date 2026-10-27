@@ -46,36 +46,62 @@ class EyeDetector:
     # ------------------------------------------------------------------
 
     @staticmethod
+    def _has_unnatural_colors(rgb: np.ndarray, threshold: float = 0.035) -> bool:
+        """Detect non-biological colors that cannot appear in an eye/skin capture:
+        - Vivid green / lime: H in [35, 85], S > 55, V > 55
+        - Vivid cyan / sky blue: H in [85, 110], S > 65, V > 65
+        - Vivid neon yellow: H in [22, 34], S > 120, V > 90
+        """
+        hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)
+        h, s, v = hsv[:, :, 0], hsv[:, :, 1], hsv[:, :, 2]
+        green = (h >= 35) & (h <= 85) & (s > 55) & (v > 55)
+        cyan = (h > 85) & (h <= 110) & (s > 65) & (v > 65)
+        yellow = (h >= 22) & (h <= 34) & (s > 120) & (v > 90)
+        frac = float((green | cyan | yellow).mean())
+        return frac > threshold
+
+    @staticmethod
     def _detect_sclera(hsv: np.ndarray, image_area: float) -> bool:
         """Look for a white/near-white region (sclera) via HSV thresholds.
 
         Sclera is characterised by low saturation and high value.
-        We expect it to occupy roughly 3–30 % of the image in a
+        We expect it to occupy roughly 2–38 % of the image in a
         close-up eye photo, and it must form a coherent region
-        (not random scattered pixels).
+        (not random scattered pixels or an all-encompassing white table).
         """
-        mask = cv2.inRange(hsv, (0, 0, 180), (180, 45, 255))
+        mask = cv2.inRange(hsv, (0, 0, 160), (180, 50, 255))
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
         total_white = float((mask > 0).sum())
         white_fraction = total_white / image_area
-        if not (0.03 <= white_fraction <= 0.35):
+        if not (0.02 <= white_fraction <= 0.38):
             return False
 
-        # Coherence: largest connected blob must be ≥ 40% of total white area
+        # Coherence: largest connected blob must be ≥ 35% of total white area
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         if not contours:
             return False
         largest = max(cv2.contourArea(c) for c in contours)
-        return largest >= total_white * 0.40
+        if largest < total_white * 0.35:
+            return False
+
+        # Border check: a white tabletop or canvas backdrop spans the full boundary
+        top = float((mask[0, :] > 0).mean())
+        bottom = float((mask[-1, :] > 0).mean())
+        left = float((mask[:, 0] > 0).mean())
+        right = float((mask[:, -1] > 0).mean())
+        if sum([top > 0.45, bottom > 0.45, left > 0.45, right > 0.45]) >= 3:
+            return False
+
+        return True
 
     @staticmethod
-    def _detect_iris_pupil(gray: np.ndarray, hsv: Optional[np.ndarray] = None) -> bool:
+    def _detect_iris_pupil(gray: np.ndarray, hsv: Optional[np.ndarray] = None, rgb: Optional[np.ndarray] = None) -> bool:
         """Detect circular iris/pupil shapes with HoughCircles.
         
         Verifies that detected circles are genuine ocular features rather than
-        uniform bright circular discs (mugs, plates, watches, lights).
+        uniform bright circular discs (mugs, plates, watches, lights) or red fruit (apples, tomatoes).
         """
         h, w = gray.shape[:2]
         min_dim = min(h, w)
@@ -116,6 +142,24 @@ class EyeDetector:
             # Circle interior must have texture / contrast (not flat solid disc)
             if float(gray[pts].std()) < 6.0:
                 continue
+
+            # Reject red fruit/objects (apples, tomatoes, red balls)
+            if rgb is not None:
+                r_c = float(rgb[pts, 0].mean())
+                g_c = float(rgb[pts, 1].mean())
+                b_c = float(rgb[pts, 2].mean())
+                if r_c - g_c > 35 and r_c - b_c > 35:
+                    continue
+
+            # Check pupil aperture in center: must be dark
+            pupil_mask = np.zeros((h, w), dtype=np.uint8)
+            cv2.circle(pupil_mask, (cx, cy), max(2, int(r * 0.35)), 255, -1)
+            p_pts = pupil_mask > 0
+            if p_pts.sum() > 0:
+                pupil_gray = float(gray[p_pts].mean())
+                if pupil_gray > 85.0:
+                    continue
+
             return True
 
         return False
@@ -149,17 +193,15 @@ class EyeDetector:
         """Check whether the image contains pinkish-red tissue (conjunctiva).
 
         Conjunctiva tissue sits in a specific hue range (roughly 0–20 or
-        160–180 in OpenCV HSV) and has moderate-to-high saturation with
-        a reddish R-channel dominance.  The region must be spatially
-        coherent (not scattered noise pixels).
+        155–180 in OpenCV HSV) and has moderate-to-high saturation with
+        a reddish R-channel dominance. It forms an elongated crescent
+        bordering the lower eyelid, NOT a spherical fruit.
         """
         hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)
-        # Pinkish-red hues wrap around 0 in HSV
-        mask_low = cv2.inRange(hsv, (0, 40, 80), (18, 200, 255))
-        mask_high = cv2.inRange(hsv, (160, 40, 80), (180, 200, 255))
+        mask_low = cv2.inRange(hsv, (0, 35, 70), (18, 200, 240))
+        mask_high = cv2.inRange(hsv, (155, 35, 70), (180, 200, 240))
         mask = cv2.bitwise_or(mask_low, mask_high)
 
-        # Morphological cleanup
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
@@ -168,16 +210,32 @@ class EyeDetector:
         image_area = float(rgb.shape[0] * rgb.shape[1])
         pink_fraction = total_pink / image_area
 
-        # Conjunctiva close-ups typically have 4-60 % pinkish-red area
-        if not (0.04 <= pink_fraction <= 0.65):
+        if not (0.03 <= pink_fraction <= 0.65):
             return False
 
-        # Coherence: largest connected blob must be ≥ 30% of total pink area
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         if not contours:
             return False
-        largest = max(cv2.contourArea(c) for c in contours)
-        return largest >= total_pink * 0.30
+
+        # Reject round spherical fruit (apples, tomatoes, balls)
+        valid_mucosa = False
+        for c in contours:
+            c_area = cv2.contourArea(c)
+            if c_area < total_pink * 0.25:
+                continue
+            peri = cv2.arcLength(c, True)
+            circ = 4 * np.pi * c_area / (peri * peri + 1e-6)
+            bx, by, bw, bh = cv2.boundingRect(c)
+            aspect = float(bw) / float(bh + 1e-6)
+
+            # Spherical fruit has high circularity and ~1:1 aspect ratio
+            if circ > 0.68 and 0.80 <= aspect <= 1.25 and c_area > 0.12 * image_area:
+                continue
+
+            valid_mucosa = True
+            break
+
+        return valid_mucosa
 
     @staticmethod
     def _detect_eyelid_edges(gray: np.ndarray) -> bool:
@@ -193,9 +251,6 @@ class EyeDetector:
         h_energy = float(np.abs(sobel_h).mean())
         v_energy = float(np.abs(sobel_v).mean())
         edge_density = float((np.abs(sobel_h) > 30).mean())
-        # Real eyelid images have:
-        # - meaningful horizontal edge density (0.05 - 0.55)
-        # - horizontal energy clearly exceeding vertical (1.2x ratio)
         return (
             h_energy > 12.0
             and 0.05 <= edge_density <= 0.55
@@ -210,13 +265,17 @@ class EyeDetector:
         """Run secondary eye-feature checks.
 
         Returns (is_eye: bool, signal_count: int, signal_names: list[str]).
-        An image is accepted only when it exhibits genuine ocular/facial
-        tissue and matches either the palpebral conjunctiva pattern or an
+        An image is accepted only when it exhibits genuine ocular tissue
+        and matches either the palpebral conjunctiva pattern or an
         open-eye anatomical structure.
         """
         rgb = image.astype(np.uint8)
         if len(rgb.shape) == 2:
             rgb = cv2.cvtColor(rgb, cv2.COLOR_GRAY2RGB)
+
+        # 1. Unnatural non-biological color rejection (limes, yellow banana, neon annotations)
+        if self._has_unnatural_colors(rgb):
+            return False, 0, []
 
         gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
         hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)
@@ -228,7 +287,7 @@ class EyeDetector:
         if has_sclera:
             signals.append("sclera")
 
-        has_iris = self._detect_iris_pupil(gray, hsv)
+        has_iris = self._detect_iris_pupil(gray, hsv, rgb)
         if has_iris:
             signals.append("iris_pupil")
 
@@ -244,21 +303,16 @@ class EyeDetector:
         if has_eyelids and (has_skin or has_conjunctiva):
             signals.append("eyelid_edges")
 
-        # Biological tissue requirement: must contain either mucosal conjunctiva
-        # or human periorbital/facial skin. Everyday inanimate objects (mugs, plates,
-        # watches, headlights) have neither.
-        has_bio_tissue = has_conjunctiva or has_skin
-
-        # Eye structural pattern:
-        # Route A: Palpebral conjunctiva close-up (clinical anemia capture)
-        #   Target mucosal tissue + supporting ocular structure (sclera or iris)
-        route_a = has_conjunctiva and (has_sclera or has_iris)
+        # Eye structural patterns:
+        # Route A: Palpebral conjunctiva close-up (clinical capture)
+        # Sclera + mucosal conjunctiva
+        route_a = has_sclera and has_conjunctiva
 
         # Route B: Open eye close-up
-        #   Iris/pupil + flanking sclera + surrounding facial/eyelid skin
-        route_b = has_iris and has_sclera and has_skin
+        # Iris/pupil + flanking sclera
+        route_b = has_iris and has_sclera
 
-        is_eye = has_bio_tissue and (route_a or route_b)
+        is_eye = (route_a or route_b)
         return is_eye, len(signals), signals
 
     # ------------------------------------------------------------------
