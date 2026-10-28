@@ -2256,16 +2256,71 @@ async function validateImageWithBackend(key, file) {
   }
 }
 
+// Automatically scale down high-megapixel smartphone captures (e.g. Galaxy S23 12-50MP raw photos)
+// to a clean clinical standard (<1600px, ~250KB) so transfers are lightning fast and never time out.
+async function optimizeImageForUpload(file, maxDim = 1600, quality = 0.90) {
+  if (!file || !file.type.startsWith("image/")) return file;
+  return new Promise((resolve) => {
+    const img = new Image();
+    const objUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(objUrl);
+      let { width, height } = img;
+      if (width <= maxDim && height <= maxDim && file.size < 600 * 1024) {
+        resolve(file);
+        return;
+      }
+      if (width > maxDim || height > maxDim) {
+        if (width > height) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          resolve(file);
+          return;
+        }
+        const optFile = new File([blob], file.name.replace(/\.[^/.]+$/, ".jpg"), {
+          type: "image/jpeg",
+          lastModified: Date.now()
+        });
+        resolve(optFile);
+      }, "image/jpeg", quality);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objUrl);
+      resolve(file);
+    };
+    img.src = objUrl;
+  });
+}
+
 async function handleFileSelected(key, file) {
   if (!file) return;
-  const url = URL.createObjectURL(file);
-  state[key] = { file, url, valid: null };
+  const badgeEl = document.getElementById("badge-" + key);
+  const m = MODALITIES.find(x => x.key === key);
+  badgeEl.className = "modality-badge checking";
+  badgeEl.innerHTML = `Scanning ${m.label}...`;
+  badgeEl.style.display = "flex";
+
+  const optimized = await optimizeImageForUpload(file);
+  const url = URL.createObjectURL(optimized);
+  state[key] = { file: optimized, url, valid: null };
   document.getElementById("slot-" + key).innerHTML = `<img class="modality-image" src="${url}" alt="${key}" />`;
   document.getElementById("clear-" + key).style.display = "";
   document.getElementById("result").classList.remove("show");
   refresh();
 
-  await validateImageWithBackend(key, file);
+  await validateImageWithBackend(key, optimized);
 }
 
 cardsEl.addEventListener("change", async e => {

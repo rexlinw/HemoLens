@@ -183,12 +183,20 @@ async def get_network_info():
     # Check if a live localhost.run or pinggy tunnel is running
     tunnel_url = None
     try:
-        import glob
-        for log_f in glob.glob("/Users/DELL/.gemini/antigravity/brain/*/.system_generated/tasks/task-*.log"):
+        import glob, os
+        logs = glob.glob("/Users/DELL/.gemini/antigravity/brain/*/.system_generated/tasks/task-*.log")
+        logs = sorted(logs, key=os.path.getmtime, reverse=True)
+        for log_f in logs:
             try:
                 with open(log_f, "r") as lf:
                     txt = lf.read()
-                    if ".lhr.life" in txt:
+                    if ".trycloudflare.com" in txt:
+                        import re
+                        m = re.search(r"https://[a-zA-Z0-9\.\-]+\.trycloudflare\.com", txt)
+                        if m:
+                            tunnel_url = m.group(0) + "/dashboard"
+                            break
+                    elif ".lhr.life" in txt:
                         import re
                         m = re.search(r"https://[a-zA-Z0-9]+\.lhr\.life", txt)
                         if m:
